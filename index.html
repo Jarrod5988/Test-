@@ -379,6 +379,11 @@
       width: 100%;
     }
 
+    #doseSummaryBox {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
     .summary {
       padding: 12px;
       background: #f7fafc;
@@ -474,12 +479,14 @@
     }
 
     .report-band {
-      background: #0f4573;
-      color: #fff;
+      background: #ffffff !important;
+      color: #0f172a !important;
       font-weight: 800;
       font-size: 16px;
       text-align: center;
       padding: 10px 14px;
+      border-top: 1px solid #cfd8e3;
+      border-bottom: 1px solid #cfd8e3;
     }
 
     .report-table-wrap {
@@ -493,10 +500,11 @@
     }
 
     .report-table th {
-      background: #2d86d5;
-      color: #fff;
+      background: #ffffff !important;
+      color: #0f172a !important;
       font-size: 12px;
       padding: 10px 8px;
+      border-bottom: 1px solid #cfd8e3;
     }
 
     .report-table td {
@@ -936,30 +944,9 @@ input:focus, select:focus, textarea:focus {
       </section>
 
       <section class="card span-5">
-        <h2>Live chemical dosage</h2>
-        <div class="kpi-wrap">
-          <div class="kpi">
-            <div class="name">Active volume</div>
-            <div class="value" id="kpiVolume">0</div>
-            <div class="unit">litres</div>
-          </div>
-          <div class="kpi">
-            <div class="name">Acid dosage</div>
-            <div class="value" id="kpiAcid">0</div>
-            <div class="unit">mL</div>
-          </div>
-          <div class="kpi">
-            <div class="name">Chlorine dosage</div>
-            <div class="value" id="kpiChlorine">0</div>
-            <div class="unit">mL</div>
-          </div>
-          <div class="kpi">
-            <div class="name">Bicarb dosage</div>
-            <div class="value" id="kpiBicarb">0</div>
-            <div class="unit">kg</div>
-          </div>
-        </div>
-        <div class="hint" style="margin-top: 14px;">Use the dropdowns to mark whether each chemical was dosed.</div>
+        <h2>Live chemical dosing</h2>
+        <div class="summary" id="doseSummaryBox">Select a pool and enter results to see the dosing needed.</div>
+        <div class="hint" style="margin-top: 14px;">One list only: amount needed, reason, and whether it was dosed.</div>
         <div class="dose-checklist" id="doseChecklist"></div>
       </section>
 
@@ -1222,7 +1209,6 @@ input:focus, select:focus, textarea:focus {
       inputs.activeVolume.value = activeVolume || '';
       if (inputs.reportSite) inputs.reportSite.value = getSelectedSite();
       if (inputs.reportPoolName) inputs.reportPoolName.value = inputs.poolSelect.value || '';
-      el('kpiVolume').textContent = activeVolume ? formatNumber(activeVolume, 0) : '0';
       updateFreeChlorineNote();
     }
 
@@ -1262,10 +1248,14 @@ input:focus, select:focus, textarea:focus {
         const statusId = `doseStatus_${key}`;
         const selected = inputs[statusId]?.value || window.__savedDoseStatuses?.[statusId] || 'no';
         const amountText = row.roundedValue !== null ? `${row.displayValue} ${row.unit}` : '-';
+        const reasonText = row.roundedValue !== null && row.roundedValue > 0 ? getChemicalReason(row) : row.displayNote;
         return `
           <div class="dose-row">
             <div class="dose-row-top">
-              <div class="dose-row-name">${row.name}</div>
+              <div>
+                <div class="dose-row-name">${row.name}</div>
+                <div class="muted" style="margin-top:4px;">${reasonText || 'No dosing needed.'}</div>
+              </div>
               <div class="dose-row-amount">${amountText}</div>
             </div>
             <div class="field" style="margin:0;">
@@ -1387,9 +1377,12 @@ input:focus, select:focus, textarea:focus {
       `).join('');
       }
 
-      el('kpiAcid').textContent = doseRows[0].roundedValue !== null ? formatNumber(doseRows[0].roundedValue, 0) : '0';
-      el('kpiChlorine').textContent = doseRows[1].roundedValue !== null ? formatNumber(doseRows[1].roundedValue, 0) : '0';
-      el('kpiBicarb').textContent = doseRows[2].roundedValue !== null ? formatNumber(doseRows[2].roundedValue, 2) : '0';
+      const doseSummaryBox = el('doseSummaryBox');
+      if (doseSummaryBox) {
+        const volumeText = volume ? `${formatNumber(volume, 0)} L` : '-';
+        const neededCount = doseRows.filter(row => row.roundedValue !== null && row.roundedValue > 0).length;
+        doseSummaryBox.textContent = `Active volume: ${volumeText} • Chemicals needing dose: ${neededCount}`;
+      }
       renderDoseChecklist(doseRows);
 
       const alerts = [];
@@ -1634,12 +1627,12 @@ input:focus, select:focus, textarea:focus {
     .report-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
     .report-meta-item { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
     .report-meta-label { font-weight: 800; color: #1e3a8a !important; }
-    .report-band { background: #0f4573; color: #fff; font-weight: 800; font-size: 16px; text-align: center; padding: 10px 14px; }
+    .report-band { background: #ffffff !important; color: #0f172a !important; font-weight: 800; font-size: 16px; text-align: center; padding: 10px 14px; border-top: 1px solid #cfd8e3; border-bottom: 1px solid #cfd8e3; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th { background: #2d86d5; color: #fff; font-size: 12px; padding: 10px 8px; text-transform: uppercase; word-wrap: break-word; }
+    th { background: #ffffff !important; color: #0f172a !important; font-size: 12px; padding: 10px 8px; text-transform: uppercase; word-wrap: break-word; border-bottom: 1px solid #cfd8e3; }
     td { font-size: 14px; padding: 10px 8px; border-bottom: 1px solid #dbe6f2; vertical-align: top; word-wrap: break-word; }
     .report-notes { padding: 14px 18px 18px; white-space: pre-wrap; }
-    .report-footer { padding: 12px 18px 18px; font-size: 13px; color: #0b3f6c; background: #f5f9fe; }
+    .report-footer { padding: 12px 18px 18px; font-size: 13px; color: #0f172a; background: #ffffff; border-top: 1px solid #cfd8e3; }
   </style>
 </head>
 <body>
@@ -1766,11 +1759,11 @@ input:focus, select:focus, textarea:focus {
 
       doc.setDrawColor(207, 216, 227);
       doc.setLineWidth(0.3);
-      doc.setFillColor(15, 69, 115);
-      doc.roundedRect(margin, y, usableWidth, 12, 2, 2, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, usableWidth, 12, 2, 2, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(18);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(15, 23, 42);
       doc.text('Water Quality Testing Report', margin + 6, y + 8.2);
       y += 16;
 
@@ -1784,7 +1777,7 @@ input:focus, select:focus, textarea:focus {
       doc.roundedRect(margin, y, leftBoxW, boxH, 2, 2, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.setTextColor(11, 63, 108);
+      doc.setTextColor(15, 23, 42);
       doc.text('MBS Facility Maintenance', margin + 4, y + 6);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
@@ -1800,6 +1793,7 @@ input:focus, select:focus, textarea:focus {
       });
 
       const rightX = margin + leftBoxW + gap;
+      doc.setFillColor(255, 255, 255);
       doc.roundedRect(rightX, y, rightBoxW, boxH, 2, 2, 'FD');
       const metaPairs = [
         ['Site', exportData.metadata.site],
@@ -1819,7 +1813,7 @@ input:focus, select:focus, textarea:focus {
         const rowY = y + 6 + (row * 6);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9.5);
-        doc.setTextColor(11, 63, 108);
+        doc.setTextColor(15, 23, 42);
         doc.text(`${pair[0]}:`, columnX, rowY);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(31, 41, 55);
@@ -1844,8 +1838,8 @@ input:focus, select:focus, textarea:focus {
           valign: 'middle'
         },
         headStyles: {
-          fillColor: [45, 134, 213],
-          textColor: [255, 255, 255],
+          fillColor: [255, 255, 255],
+          textColor: [15, 23, 42],
           fontStyle: 'bold',
           halign: 'center'
         },
@@ -1882,11 +1876,11 @@ input:focus, select:focus, textarea:focus {
           exportData.readings.salt || ''
         ]],
         didDrawPage: (data) => {
-          doc.setFillColor(15, 69, 115);
-          doc.rect(margin, data.settings.startY - 6, usableWidth, 5, 'F');
+          doc.setFillColor(255, 255, 255);
+          doc.rect(margin, data.settings.startY - 6, usableWidth, 5, 'FD');
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(10);
-          doc.setTextColor(255, 255, 255);
+          doc.setTextColor(15, 23, 42);
           doc.text('Water Test Results', margin + 3, data.settings.startY - 2.4);
         }
       });
@@ -1908,8 +1902,8 @@ input:focus, select:focus, textarea:focus {
           valign: 'top'
         },
         headStyles: {
-          fillColor: [45, 134, 213],
-          textColor: [255, 255, 255],
+          fillColor: [255, 255, 255],
+          textColor: [15, 23, 42],
           fontStyle: 'bold',
           halign: 'center'
         },
@@ -1933,11 +1927,11 @@ input:focus, select:focus, textarea:focus {
           row.notes || ''
         ]),
         didDrawPage: (data) => {
-          doc.setFillColor(15, 69, 115);
-          doc.rect(margin, data.settings.startY - 6, usableWidth, 5, 'F');
+          doc.setFillColor(255, 255, 255);
+          doc.rect(margin, data.settings.startY - 6, usableWidth, 5, 'FD');
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(10);
-          doc.setTextColor(255, 255, 255);
+          doc.setTextColor(15, 23, 42);
           doc.text('Chemicals Added', margin + 3, data.settings.startY - 2.4);
         }
       });
@@ -1953,11 +1947,11 @@ input:focus, select:focus, textarea:focus {
         y = notesTitleY;
       }
 
-      doc.setFillColor(15, 69, 115);
-      doc.rect(margin, y, usableWidth, notesTitleH, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.rect(margin, y, usableWidth, notesTitleH, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(15, 23, 42);
       doc.text('Corrective Action / Technician Notes', margin + 3, y + 3.6);
       y += notesTitleH + 3;
 
@@ -1977,7 +1971,7 @@ input:focus, select:focus, textarea:focus {
         doc.rect(margin, y, usableWidth, notesTitleH, 'F');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(15, 23, 42);
         doc.text('Corrective Action / Technician Notes', margin + 3, y + 3.6);
         y += notesTitleH + 3;
       }
@@ -2074,12 +2068,12 @@ input:focus, select:focus, textarea:focus {
               .report-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
               .report-meta-item { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
               .report-meta-label { font-weight: 800; color: #1e3a8a !important; }
-              .report-band { background: #0f4573; color: #fff; font-weight: 800; font-size: 16px; text-align: center; padding: 10px 14px; }
+              .report-band { background: #ffffff !important; color: #0f172a !important; font-weight: 800; font-size: 16px; text-align: center; padding: 10px 14px; border-top: 1px solid #cfd8e3; border-bottom: 1px solid #cfd8e3; }
               table { width: 100%; border-collapse: collapse; }
-              th { background: #2d86d5; color: #fff; font-size: 12px; padding: 10px 8px; }
+              th { background: #ffffff !important; color: #0f172a !important; font-size: 12px; padding: 10px 8px; border-bottom: 1px solid #cfd8e3; }
               td { font-size: 14px; padding: 10px 8px; border-bottom: 1px solid #dbe6f2; }
               .report-notes { padding: 14px 18px 18px; white-space: pre-wrap; }
-              .report-footer { padding: 12px 18px 18px; font-size: 13px; color: #0b3f6c; background: #f5f9fe; }
+              .report-footer { padding: 12px 18px 18px; font-size: 13px; color: #0f172a; background: #ffffff; border-top: 1px solid #cfd8e3; }
             </style>
           </head>
           <body>
