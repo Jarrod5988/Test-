@@ -3,6 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Pool Dosing Calculator" />
+  <meta name="theme-color" content="#1e88e5" />
   <title>MBS FM Pool Dosing Calculator</title>
   <style>
     :root {
@@ -459,11 +467,10 @@
               <canvas id="processedCanvas" class="hidden"></canvas>
             </div>
             <div class="hint">Best results: fill the frame with the blue Spin Touch results screen, keep the phone straight, and avoid glare.</div>
-          </div>          <div hidden aria-hidden="true">
-            <div id="importStatus">Waiting for a photo.</div>
-            <input id="testTime" type="hidden" />
-            <textarea id="ocrText" class="hidden"></textarea>
           </div>
+          <input id="importStatus" type="hidden" value="Waiting for a photo." />
+          <input id="testTime" type="hidden" />
+          <textarea id="ocrText" class="hidden"></textarea>
         </div>
         <input id="cameraInput" class="hidden" type="file" accept="image/*" capture="environment" />
         <input id="libraryInput" class="hidden" type="file" accept="image/*" />
@@ -525,6 +532,7 @@
           <div class="field">
             <label for="targetFreeChlorine">Target free chlorine</label>
             <input id="targetFreeChlorine" type="number" inputmode="decimal" step="0.1" min="0" value="4" />
+            <small id="targetFreeChlorineNote">Minimum range for selected pool: 1.5 ppm</small>
           </div>
           <div class="field">
             <label for="targetAlkalinity">Target alkalinity</label>
@@ -555,14 +563,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
-    const STORAGE_KEY = 'mbsfm_pool_dosing_calculator_v4';
+    const STORAGE_KEY = 'mbsfm_pool_dosing_calculator_v5';
 
     const savedPools = [
-      { name: 'Raiders Hydrotherapy Pool', volume: 32000 },
-      { name: 'Raiders Ice Bath', volume: 6000 },
-      { name: 'James Court Pool', volume: 90000 },
-      { name: 'James Court Spa', volume: 6000 },
-      { name: 'Custom Pool', volume: '' }
+      { name: 'Raiders Hydrotherapy Pool', volume: 32000, chlorineMin: 1.5 },
+      { name: 'Raiders Ice Bath', volume: 6000, chlorineMin: 3.0 },
+      { name: 'James Court Pool', volume: 90000, chlorineMin: 1.5 },
+      { name: 'James Court Spa', volume: 6000, chlorineMin: 1.5 },
+      { name: 'Custom Pool', volume: '', chlorineMin: null }
     ];
 
     const el = (id) => document.getElementById(id);
@@ -628,6 +636,24 @@
       `).join('');
     }
 
+    function getSelectedPoolConfig() {
+      return savedPools.find(pool => pool.name === inputs.poolSelect.value) || null;
+    }
+
+    function getSelectedFreeChlorineMin() {
+      const selected = getSelectedPoolConfig();
+      return selected && selected.chlorineMin !== undefined ? selected.chlorineMin : null;
+    }
+
+    function updateFreeChlorineNote() {
+      const note = el('targetFreeChlorineNote');
+      if (!note) return;
+      const minimum = getSelectedFreeChlorineMin();
+      note.textContent = minimum !== null && minimum !== undefined
+        ? `Minimum range for selected pool: ${formatNumber(minimum, 1)} ppm`
+        : 'Minimum range can be set manually for this pool.';
+    }
+
     function updatePoolVolumes() {
       const selected = savedPools.find(pool => pool.name === inputs.poolSelect.value);
       const autoVolume = selected && selected.volume !== '' ? selected.volume : '';
@@ -637,6 +663,7 @@
       inputs.poolVolumeAuto.value = autoVolume;
       inputs.activeVolume.value = activeVolume || '';
       el('kpiVolume').textContent = activeVolume ? formatNumber(activeVolume, 0) : '0';
+      updateFreeChlorineNote();
     }
 
     function calculateAcidMl(volume, currentPh, alkalinity, targetPh) {
@@ -815,10 +842,28 @@
         }
       }
       if (freeChlorine !== null) {
-        if (freeChlorine < targetFreeChlorine) {
-          alerts.push({ name: 'Free chlorine', value: freeChlorine.toFixed(2), level: 'warn', text: 'Below target - chlorine dose shown.' });
+        const freeChlorineMinimum = getSelectedFreeChlorineMin();
+        if (freeChlorineMinimum !== null && freeChlorine < freeChlorineMinimum) {
+          alerts.push({
+            name: 'Free chlorine',
+            value: freeChlorine.toFixed(2),
+            level: 'warn',
+            text: `Below minimum range (${formatNumber(freeChlorineMinimum, 1)} ppm) - chlorine dose shown.`
+          });
+        } else if (targetFreeChlorine !== null && freeChlorine < targetFreeChlorine) {
+          alerts.push({
+            name: 'Free chlorine',
+            value: freeChlorine.toFixed(2),
+            level: 'good',
+            text: `Above minimum range${freeChlorineMinimum !== null ? ` (${formatNumber(freeChlorineMinimum, 1)} ppm)` : ''}, below target.`
+          });
         } else {
-          alerts.push({ name: 'Free chlorine', value: freeChlorine.toFixed(2), level: 'good', text: 'At or above target.' });
+          alerts.push({
+            name: 'Free chlorine',
+            value: freeChlorine.toFixed(2),
+            level: 'good',
+            text: targetFreeChlorine !== null ? 'At or above target.' : 'Within range.'
+          });
         }
       }
       if (copper !== null) {
@@ -932,7 +977,7 @@
       photoPreview.classList.add('hidden');
       processedCanvas.classList.add('hidden');
       previewBox.querySelector('.placeholder')?.classList.remove('hidden');
-      importStatus.textContent = 'Waiting for a photo.';
+      setImportStatus('Waiting for a photo.');
       reReadBtn.disabled = true;
       updateAll();
     }
@@ -975,14 +1020,19 @@
       const summary = buildSummaryText();
       try {
         await navigator.clipboard.writeText(summary);
-        importStatus.textContent = 'Dose summary copied to clipboard.';
+        setImportStatus('Dose summary copied to clipboard.');
       } catch (error) {
-        importStatus.textContent = 'Could not copy automatically. You can still select and copy the results manually.';
+        setImportStatus('Could not copy automatically. You can still select and copy the results manually.');
       }
     }
 
     function setImportStatus(message) {
-      importStatus.textContent = message;
+      if (!importStatus) return;
+      if ('value' in importStatus) {
+        importStatus.value = message;
+      } else {
+        importStatus.textContent = message;
+      }
     }
 
     function clamp(value, min, max) {
