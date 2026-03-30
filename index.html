@@ -192,6 +192,17 @@
       cursor: not-allowed;
     }
 
+    .button.icon-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .button-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
     .actions {
       display: flex;
       flex-wrap: wrap;
@@ -384,6 +395,20 @@
       border-radius: 18px;
       overflow: hidden;
       background: #fff;
+      min-height: 180px;
+    }
+
+    .report-raw {
+      margin-top: 12px;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      background: #fbfdff;
+      min-height: 220px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
     }
 
     .report-inner {
@@ -674,8 +699,7 @@
       <section class="card span-12">
         <h2>Water Quality Testing Report</h2>
         <div class="actions">
-          <button class="button secondary" type="button" id="copyReportBtn">Copy report text</button>
-          <button class="button ghost" type="button" id="printReportBtn">Print report</button>
+          <button class="button icon-button" type="button" id="saveReportBtn"><span class="button-icon" aria-hidden="true">💾</span><span>Generate &amp; Save</span></button>
         </div>
         <div class="field-grid" style="margin-top: 12px;">
           <div class="field">
@@ -688,7 +712,7 @@
           </div>
           <div class="field">
             <label for="reportTechnician">Technician</label>
-            <input id="reportTechnician" type="text" value="Jarrod Strange" />
+            <input id="reportTechnician" type="text" placeholder="Enter technician name" />
           </div>
           <div class="field">
             <label for="reportDate">Date</label>
@@ -708,7 +732,10 @@
           <label for="technicianNotes">Additional notes</label>
           <textarea id="technicianNotes" placeholder="Optional technician notes for the report."></textarea>
         </div>
-        <div id="reportPreview" class="report-sheet"></div>
+        <div id="reportPreview" class="report-sheet">
+          <div class="summary">Report preview will appear here.</div>
+        </div>
+        <textarea id="reportTextOutput" class="report-raw" readonly></textarea>
       </section>
     </div>
   </div>
@@ -754,6 +781,7 @@
       waterClarity: el('waterClarity'),
       technicianNotes: el('technicianNotes'),
       reportPreview: el('reportPreview'),
+      reportTextOutput: el('reportTextOutput'),
       doseStatus_acid: null,
       doseStatus_chlorine: null,
       doseStatus_bicarb: null,
@@ -1226,6 +1254,83 @@
           <div class="report-footer">Generated from the calculator. Update values in the app and this report refreshes automatically.</div>
         </div>
       `;
+      if (inputs.reportTextOutput) {
+        inputs.reportTextOutput.value = buildReportText();
+      }
+    }
+
+    function buildReportFilename(extension = 'html') {
+      const datePart = (inputs.reportDate.value || getTodayIsoDate()).replace(/-/g, '');
+      const site = (inputs.reportSite.value || 'site').trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+      const pool = (inputs.reportPoolName.value || 'pool').trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+      return `${site || 'site'}_${pool || 'pool'}_${datePart}_water-quality-report.${extension}`.toLowerCase();
+    }
+
+    function buildStandaloneReportHtml() {
+      const reportHtml = inputs.reportPreview?.innerHTML || '';
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Water Quality Testing Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 20px; color: #1f2937; background: #ffffff; }
+    .report-sheet { border: 1px solid #cfd8e3; border-radius: 14px; overflow: hidden; background: #fff; }
+    .report-title { padding: 18px 18px 8px; font-size: 30px; font-weight: 800; color: #0b3f6c; }
+    .report-top { display: grid; grid-template-columns: 1fr 1.2fr; gap: 14px; padding: 0 18px 18px; }
+    .report-company, .report-meta { border: 1px solid #cfd8e3; border-radius: 12px; padding: 14px; background: #fbfdff; font-size: 14px; line-height: 1.5; }
+    .report-meta-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+    .report-meta-item { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
+    .report-meta-label { font-weight: 800; color: #0b3f6c; }
+    .report-band { background: #0f4573; color: #fff; font-weight: 800; font-size: 16px; text-align: center; padding: 10px 14px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #2d86d5; color: #fff; font-size: 12px; padding: 10px 8px; text-transform: uppercase; }
+    td { font-size: 14px; padding: 10px 8px; border-bottom: 1px solid #dbe6f2; vertical-align: top; }
+    .report-notes { padding: 14px 18px 18px; white-space: pre-wrap; }
+    .report-footer { padding: 12px 18px 18px; font-size: 13px; color: #0b3f6c; background: #f5f9fe; }
+  </style>
+</head>
+<body>
+  <div class="report-sheet">${reportHtml}</div>
+</body>
+</html>`;
+    }
+
+    async function saveReportFile() {
+      const html = buildStandaloneReportHtml();
+      const filename = buildReportFilename('html');
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+
+      if (navigator.share && window.File) {
+        const file = new File([blob], filename, { type: 'text/html' });
+        try {
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: 'Water Quality Testing Report',
+              text: 'Choose Save to Files to store this report on your iPhone.',
+              files: [file]
+            });
+            setImportStatus('Report generated. Choose Save to Files on your iPhone.');
+            return;
+          }
+        } catch (error) {
+          if (error && error.name === 'AbortError') {
+            setImportStatus('Save cancelled.');
+            return;
+          }
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      setImportStatus('Report file generated. Save it from your iPhone downloads/files.');
     }
 
     function buildReportText() {
@@ -1345,7 +1450,6 @@
         targetSalt: inputs.targetSalt.value,
         testTime: inputs.testTime.value,
         ocrText: inputs.ocrText.value,
-        reportTechnician: inputs.reportTechnician.value,
         reportDate: inputs.reportDate.value,
         waterClarity: inputs.waterClarity.value,
         technicianNotes: inputs.technicianNotes.value,
@@ -1392,7 +1496,7 @@
       inputs.targetCalcium.value = '250';
       inputs.targetCya.value = '0';
       inputs.targetSalt.value = '1000';
-      inputs.reportTechnician.value = 'Jarrod Strange';
+      inputs.reportTechnician.value = '';
       inputs.reportDate.value = getTodayIsoDate();
       inputs.waterClarity.value = 'Clear';
       window.__savedDoseStatuses = {
@@ -1823,8 +1927,7 @@
       });
 
       el('resetBtn').addEventListener('click', resetAll);
-      el('copyReportBtn').addEventListener('click', copyReport);
-      el('printReportBtn').addEventListener('click', printReport);
+      el('saveReportBtn').addEventListener('click', saveReportFile);
       el('takePhotoBtn').addEventListener('click', () => cameraInput.click());
       el('choosePhotoBtn').addEventListener('click', () => libraryInput.click());
       reReadBtn.addEventListener('click', readSelectedPhoto);
@@ -1839,10 +1942,12 @@
       loadState();
       if (!inputs.poolSelect.value) inputs.poolSelect.value = savedPools[0].name;
       if (!inputs.reportDate.value) inputs.reportDate.value = getTodayIsoDate();
-      if (!inputs.reportTechnician.value) inputs.reportTechnician.value = 'Jarrod Strange';
       if (!inputs.waterClarity.value) inputs.waterClarity.value = 'Clear';
       attachListeners();
       updateAll();
+      if (inputs.reportTextOutput && !inputs.reportTextOutput.value) {
+        inputs.reportTextOutput.value = buildReportText();
+      }
     }
 
     init();
