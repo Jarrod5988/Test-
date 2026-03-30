@@ -432,6 +432,9 @@
             <div class="field">
               <label for="ocrText">OCR text</label>
               <textarea id="ocrText" placeholder="OCR output will appear here"></textarea>
+              <div class="actions" style="margin-top: 10px;">
+                <button class="button ghost" type="button" id="applyOcrBtn">Fill from OCR text</button>
+              </div>
             </div>
           </div>
         </div>
@@ -962,31 +965,158 @@
       importStatus.textContent = message;
     }
 
-    function preprocessImageForOcr(image) {
-      const maxWidth = 1600;
-      const scale = Math.min(1, maxWidth / image.width);
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function findSpinTouchScreenRect(image) {
+      const sampleCanvas = document.createElement('canvas');
+      const maxSide = 420;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
       const width = Math.max(1, Math.round(image.width * scale));
       const height = Math.max(1, Math.round(image.height * scale));
-
-      processedCanvas.width = width;
-      processedCanvas.height = height;
-      const ctx = processedCanvas.getContext('2d', { willReadFrequently: true });
+      sampleCanvas.width = width;
+      sampleCanvas.height = height;
+      const ctx = sampleCanvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(image, 0, 0, width, height);
 
       const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
+      const mask = new Uint8Array(width * height);
+
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          const brightness = (r + g + b) / 3;
+          const maxRG = Math.max(r, g);
+          const isBlueDisplay = b > 70 && b > maxRG + 10 && brightness > 45;
+          if (isBlueDisplay) mask[y * width + x] = 1;
+        }
+      }
+
+      const visited = new Uint8Array(width * height);
+      const stackX = new Int32Array(width * height);
+      const stackY = new Int32Array(width * height);
+      let best = null;
+
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const index = y * width + x;
+          if (!mask[index] || visited[index]) continue;
+
+          let pointer = 0;
+          stackX[pointer] = x;
+          stackY[pointer] = y;
+          pointer += 1;
+          visited[index] = 1;
+
+          let area = 0;
+          let minX = x;
+          let maxX = x;
+          let minY = y;
+          let maxY = y;
+
+          while (pointer > 0) {
+            pointer -= 1;
+            const cx = stackX[pointer];
+            const cy = stackY[pointer];
+            area += 1;
+            if (cx < minX) minX = cx;
+            if (cx > maxX) maxX = cx;
+            if (cy < minY) minY = cy;
+            if (cy > maxY) maxY = cy;
+
+            const neighbors = [
+              [cx + 1, cy],
+              [cx - 1, cy],
+              [cx, cy + 1],
+              [cx, cy - 1]
+            ];
+
+            neighbors.forEach(([nx, ny]) => {
+              if (nx < 0 || ny < 0 || nx >= width || ny >= height) return;
+              const nIndex = ny * width + nx;
+              if (!mask[nIndex] || visited[nIndex]) return;
+              visited[nIndex] = 1;
+              stackX[pointer] = nx;
+              stackY[pointer] = ny;
+              pointer += 1;
+            });
+          }
+
+          const regionWidth = maxX - minX + 1;
+          const regionHeight = maxY - minY + 1;
+          const largeEnough = regionWidth > width * 0.3 && regionHeight > height * 0.18;
+          if (!largeEnough) continue;
+
+          if (!best || area > best.area) {
+            best = { minX, maxX, minY, maxY, area };
+          }
+        }
+      }
+
+      if (!best) {
+        return { x: 0, y: 0, width: image.width, height: image.height };
+      }
+
+      const padX = Math.round((best.maxX - best.minX + 1) * 0.04);
+      const padY = Math.round((best.maxY - best.minY + 1) * 0.06);
+      const sourceX = clamp(Math.round((best.minX - padX) / scale), 0, image.width - 1);
+      const sourceY = clamp(Math.round((best.minY - padY) / scale), 0, image.height - 1);
+      const sourceRight = clamp(Math.round((best.maxX + padX + 1) / scale), sourceX + 1, image.width);
+      const sourceBottom = clamp(Math.round((best.maxY + padY + 1) / scale), sourceY + 1, image.height);
+
+      return {
+        x: sourceX,
+        y: sourceY,
+        width: sourceRight - sourceX,
+        height: sourceBottom - sourceY
+      };
+    }
+
+    function buildOcrCanvas(image, mode = 'threshold') {
+      const rect = findSpinTouchScreenRect(image);
+      const maxWidth = 1200;
+      const targetWidth = Math.max(1, Math.round(Math.min(maxWidth, rect.width * 2.2)));
+      const targetHeight = Math.max(1, Math.round(targetWidth * (rect.height / rect.width)));
+
+      processedCanvas.width = targetWidth;
+      processedCanvas.height = targetHeight;
+      const ctx = processedCanvas.getContext('2d', { willReadFrequently: true });
+      ctx.clearRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height, 0, 0, targetWidth, targetHeight);
+
+      const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+      const data = imageData.data;
+
+      let minGray = 255;
+      let maxGray = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round((0.2126 * data[i]) + (0.7152 * data[i + 1]) + (0.0722 * data[i + 2]));
+        if (gray < minGray) minGray = gray;
+        if (gray > maxGray) maxGray = gray;
+      }
+      const contrastRange = Math.max(1, maxGray - minGray);
+      const threshold = clamp(minGray + contrastRange * 0.68, 145, 205);
 
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        let gray = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
-        gray = (gray - 90) * 2.6 + 128;
-        gray = Math.max(0, Math.min(255, gray));
-        const value = gray > 145 ? 255 : 0;
-        data[i] = value;
-        data[i + 1] = value;
-        data[i + 2] = value;
+        const gray = Math.round((0.2126 * data[i]) + (0.7152 * data[i + 1]) + (0.0722 * data[i + 2]));
+        let normalized = ((gray - minGray) / contrastRange) * 255;
+        normalized = clamp((normalized - 120) * 1.8 + 120, 0, 255);
+
+        if (mode === 'threshold') {
+          const value = normalized >= threshold ? 0 : 255;
+          data[i] = value;
+          data[i + 1] = value;
+          data[i + 2] = value;
+        } else {
+          data[i] = normalized;
+          data[i + 1] = normalized;
+          data[i + 2] = normalized;
+        }
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -994,33 +1124,54 @@
       return processedCanvas;
     }
 
-    function parseSpinTouchText(text) {
-      const cleaned = (text || '')
+    function normalizeOcrText(text) {
+      return (text || '')
         .replace(/[|]/g, 'I')
         .replace(/[\u2013\u2014]/g, '-')
         .replace(/\r/g, '\n')
         .replace(/[ ]{2,}/g, ' ')
+        .replace(/\bFCI\b/g, 'FCL')
+        .replace(/\bFEL\b/g, 'FCL')
+        .replace(/\bFGL\b/g, 'FCL')
+        .replace(/\bAIK\b/g, 'ALK')
+        .replace(/\bALX\b/g, 'ALK')
+        .replace(/\bCY4\b/g, 'CYA')
+        .replace(/\bCVA\b/g, 'CYA')
+        .replace(/\bPH0S\b/g, 'PHOS')
         .toUpperCase();
+    }
 
-      const findValue = (pattern) => {
-        const match = cleaned.match(pattern);
-        if (!match) return null;
-        const value = Number(match[1]);
-        return Number.isFinite(value) ? value : null;
+    function parseSpinTouchText(text) {
+      const cleaned = normalizeOcrText(text);
+
+      const findValue = (...patterns) => {
+        for (const pattern of patterns) {
+          const match = cleaned.match(pattern);
+          if (!match) continue;
+          const value = Number(String(match[1]).replace(',', '.'));
+          if (Number.isFinite(value)) return value;
+        }
+        return null;
       };
 
-      const testTimeMatch = cleaned.match(/TEST\s*TIME\s*([0-9:APM\- ]+)/);
+      const testTimeMatch = cleaned.match(/TEST\s*TIME\s*[:=]?\s*([0-9: ]+[APM]{0,2}(?:\s+[0-9]{1,2}-[A-Z]{3}-[0-9]{4})?)/);
       return {
         testTime: testTimeMatch ? testTimeMatch[1].trim() : '',
-        freeChlorine: findValue(/FCL\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        ph: findValue(/PH\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        alkalinity: findValue(/ALK\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        calciumHardness: findValue(/HARD\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        cyanuricAcid: findValue(/CYA\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        copper: findValue(/COPPER\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        phosphates: findValue(/PHOS\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/),
-        salt: findValue(/SALT\s*[:=]?\s*([0-9]+(?:\.[0-9]+)?)/)
+        freeChlorine: findValue(/\bFCL\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bF\s*C\s*L\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        ph: findValue(/\bPH\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bP\s*H\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        alkalinity: findValue(/\bALK\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        calciumHardness: findValue(/\bHARD\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bHAR[D0O]\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        cyanuricAcid: findValue(/\bCYA\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        copper: findValue(/\bCOPP(?:ER|FR|EF)\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bCOPPER\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        phosphates: findValue(/\bPHOS\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/, /\bPH[O0]S\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/),
+        salt: findValue(/\bSALT\b\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/)
       };
+    }
+
+    function countParsedFields(parsed) {
+      return ['freeChlorine', 'ph', 'alkalinity', 'calciumHardness', 'cyanuricAcid', 'copper', 'phosphates', 'salt']
+        .filter(key => parsed[key] !== null && parsed[key] !== undefined)
+        .length;
     }
 
     function fillImportedValues(parsed) {
@@ -1047,6 +1198,29 @@
       return filledCount;
     }
 
+    function applyOcrText() {
+      const parsed = parseSpinTouchText(inputs.ocrText.value);
+      const filledCount = fillImportedValues(parsed);
+      if (filledCount > 0) {
+        setImportStatus(`Filled ${filledCount} test result fields from OCR text${parsed.testTime ? ' and the test time' : ''}.`);
+      } else {
+        setImportStatus('No result fields were recognised from the OCR text yet.');
+      }
+    }
+
+    async function runOcrPass(canvas, modeLabel) {
+      const result = await Tesseract.recognize(canvas, 'eng', {
+        logger: (message) => {
+          if (message.status === 'recognizing text' && typeof message.progress === 'number') {
+            setImportStatus(`Reading Spin Touch photo... ${modeLabel} ${Math.round(message.progress * 100)}%`);
+          }
+        },
+        tessedit_pageseg_mode: 6,
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.: -'
+      });
+      return result?.data?.text || '';
+    }
+
     async function readSelectedPhoto() {
       if (!currentImage) return;
       if (!window.Tesseract) {
@@ -1056,26 +1230,31 @@
 
       try {
         setImportStatus('Reading Spin Touch photo...');
-        const source = preprocessImageForOcr(currentImage);
-        const result = await Tesseract.recognize(source, 'eng', {
-          logger: (message) => {
-            if (message.status === 'recognizing text' && typeof message.progress === 'number') {
-              setImportStatus(`Reading Spin Touch photo... ${Math.round(message.progress * 100)}%`);
-            }
-          },
-          tessedit_pageseg_mode: 6,
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.: -'
-        });
+        const firstCanvas = buildOcrCanvas(currentImage, 'threshold');
+        let bestText = await runOcrPass(firstCanvas, 'pass 1');
+        let bestParsed = parseSpinTouchText(bestText);
+        let bestCount = countParsedFields(bestParsed);
 
-        const text = result?.data?.text || '';
-        inputs.ocrText.value = text.trim();
-        const parsed = parseSpinTouchText(text);
-        const filledCount = fillImportedValues(parsed);
+        if (bestCount < 4) {
+          const secondCanvas = buildOcrCanvas(currentImage, 'grayscale');
+          const secondText = await runOcrPass(secondCanvas, 'pass 2');
+          const combinedText = [bestText, secondText].filter(Boolean).join('\n');
+          const combinedParsed = parseSpinTouchText(combinedText);
+          const combinedCount = countParsedFields(combinedParsed);
+          if (combinedCount >= bestCount) {
+            bestText = combinedText;
+            bestParsed = combinedParsed;
+            bestCount = combinedCount;
+          }
+        }
+
+        inputs.ocrText.value = bestText.trim();
+        const filledCount = fillImportedValues(bestParsed);
 
         if (filledCount > 0) {
-          setImportStatus(`Photo imported. Filled ${filledCount} test result fields${parsed.testTime ? ' and the test time' : ''}. Check the values and adjust if needed.`);
+          setImportStatus(`Photo imported. Filled ${filledCount} test result fields${bestParsed.testTime ? ' and the test time' : ''}. Check the values and adjust if needed.`);
         } else {
-          setImportStatus('OCR ran, but no result fields were matched. Try a tighter photo of the blue screen or type the values manually.');
+          setImportStatus('OCR ran, but no result fields were matched. Try a tighter photo of just the blue screen or tap Fill from OCR text after editing the OCR text box.');
         }
       } catch (error) {
         console.error(error);
@@ -1113,6 +1292,7 @@
       el('takePhotoBtn').addEventListener('click', () => cameraInput.click());
       el('choosePhotoBtn').addEventListener('click', () => libraryInput.click());
       reReadBtn.addEventListener('click', readSelectedPhoto);
+      el('applyOcrBtn').addEventListener('click', applyOcrText);
       cameraInput.addEventListener('change', event => handlePhotoFile(event.target.files[0]));
       libraryInput.addEventListener('change', event => handlePhotoFile(event.target.files[0]));
     }
