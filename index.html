@@ -687,12 +687,12 @@
       </section>
 
       <section class="card span-12">
-        <h2>Report</h2>
+        <h2>Service report</h2>
         <div class="actions" style="margin-bottom: 12px;">
           <button class="button" id="generateReportBtn" type="button">Generate report</button>
           <button class="button secondary" id="saveReportBtn" type="button">Generate and save PDF</button>
         </div>
-        <div class="report-output" id="reportOutput">Tap Generate report to build the service summary.</div>
+        <div class="report-output" id="reportOutput">Tap Generate report to build the service report.</div>
         <div class="footer-note">PDF export is set to landscape.</div>
       </section>
     </div>
@@ -1110,40 +1110,220 @@
       }
     }
 
-    function buildReportText() {
-      const { rows, doses, volume } = buildRecommendationRows();
-      const lines = [];
-      lines.push('WATER QUALITY TESTING REPORT');
-      lines.push('');
-      lines.push(`Site: ${inputs.reportSite.value || ''}`);
-      lines.push(`Pool: ${inputs.reportPoolName.value || ''}`);
-      lines.push(`Technician: ${inputs.reportTechnician.value || ''}`);
-      lines.push(`Date: ${inputs.reportDate.value || ''}`);
-      lines.push(`Test time: ${inputs.testTime.value || ''}`);
-      lines.push(`Water clarity: ${inputs.waterClarity.value || ''}`);
-      lines.push(`Volume: ${formatNumber(volume, 0)} L`);
-      lines.push('');
-      lines.push('CURRENT RESULTS AND TARGETS');
-      rows.forEach(row => {
-        lines.push(`- ${row.parameter}: current ${row.current == null ? '-' : formatNumber(row.current, row.decimals)} | target ${row.target == null ? '-' : formatNumber(row.target, row.decimals)} | ${row.status.label} | ${row.action}`);
-      });
-      lines.push('');
-      lines.push('CHEMICAL DOSING CHECKLIST');
-      [
+    function getReportDoseItems(doses) {
+      return [
         { key: 'acid', value: doses.acid, unit: 'mL', decimals: 0 },
         { key: 'chlorine', value: doses.chlorine, unit: 'mL', decimals: 0 },
         { key: 'bicarb', value: doses.bicarb, unit: 'kg', decimals: 2 },
         { key: 'calcium', value: doses.calcium, unit: 'kg', decimals: 2 },
         { key: 'salt', value: doses.salt, unit: 'kg', decimals: 2 }
-      ].forEach(item => {
-        const statusField = qs(`doseStatus_${item.key}`);
-        const noteField = qs(`doseNote_${item.key}`);
-        lines.push(`- ${chemicalNames[item.key]}: ${formatDose(item.value, item.unit, item.decimals)} | Dosed: ${(statusField && statusField.value) || 'No'}${noteField && noteField.value ? ` | Note: ${noteField.value}` : ''}`);
-      });
+      ];
+    }
+
+    function getAssetLabel(poolName = '') {
+      const name = String(poolName || '').toLowerCase();
+      if (name.includes('spa')) return 'Spa';
+      if (name.includes('ice bath')) return 'Ice Bath';
+      return 'Pool';
+    }
+
+    function getServiceTypeLabel(poolName = '') {
+      const asset = getAssetLabel(poolName).toLowerCase();
+      return `Routine ${asset} maintenance`;
+    }
+
+    function getDoseFieldSnapshot(key) {
+      const statusField = qs(`doseStatus_${key}`);
+      const noteField = qs(`doseNote_${key}`);
+      return {
+        status: ((statusField && statusField.value) || 'No').toLowerCase(),
+        note: noteField && noteField.value ? noteField.value.trim() : ''
+      };
+    }
+
+    function buildChemicalSentence(key, amount, unit, decimals, outcomeText) {
+      const { status, note } = getDoseFieldSnapshot(key);
+      const chemicalName = chemicalNames[key];
+      let sentence = '';
+
+      if (Number.isFinite(amount) && amount > 0) {
+        const lead = status === 'yes' ? 'Added' : 'Recommended';
+        sentence = `${lead} ${formatDose(amount, unit, decimals)} of ${chemicalName}`;
+        if (outcomeText) sentence += ` ${outcomeText}`;
+        sentence += '.';
+      } else if (status === 'yes') {
+        sentence = `${chemicalName} was marked as dosed.`;
+      }
+
+      if (note) {
+        sentence += `${sentence ? ' ' : ''}Note: ${note}.`;
+      }
+
+      return sentence;
+    }
+
+    function buildReportLines() {
+      const { rows, doses, volume } = buildRecommendationRows();
+      const lines = [];
+
+      const site = inputs.reportSite.value || '';
+      const pool = inputs.reportPoolName.value || '';
+      const technician = inputs.reportTechnician.value || '';
+      const date = inputs.reportDate.value || '';
+      const testTime = inputs.testTime.value || '';
+      const waterClarity = inputs.waterClarity.value || '';
+      const serviceNotes = (inputs.serviceNotes.value || '').trim();
+      const temperature = n(inputs.temperature.value);
+      const phosphates = n(inputs.phosphates.value);
+      const assetLabel = getAssetLabel(pool);
+      const serviceType = getServiceTypeLabel(pool);
+
+      lines.push(`MBS FM`);
+      lines.push(`Service Report – ${assetLabel}`);
+      lines.push(`Service Type: ${serviceType}`);
       lines.push('');
-      lines.push('SERVICE NOTES');
-      lines.push(inputs.serviceNotes.value || '');
-      return lines.join('\n');
+      lines.push(`Site: ${site || '-'}`);
+      lines.push(`System: ${pool || '-'}`);
+      lines.push(`Technician: ${technician || '-'}`);
+      lines.push(`Date: ${date || '-'}`);
+      lines.push(`Time: ${testTime || '-'}`);
+      lines.push(`Water Clarity: ${waterClarity || '-'}`);
+      lines.push(`Active Volume: ${formatNumber(volume, 0)} L`);
+      lines.push('');
+      lines.push('Tasks Completed:');
+
+      const taskLines = [];
+      taskLines.push(`Conducted full ${assetLabel.toLowerCase()} water test.`);
+      if (waterClarity) {
+        taskLines.push(`Water clarity observed as ${waterClarity.toLowerCase()}.`);
+      }
+      if (Number.isFinite(temperature)) {
+        taskLines.push(`Recorded water temperature at ${formatNumber(temperature, 1)} °C.`);
+      }
+
+      const rowByParameter = Object.fromEntries(rows.map(row => [row.parameter, row]));
+      const pHRow = rowByParameter['pH'];
+      const fcRow = rowByParameter['Free chlorine'];
+      const alkRow = rowByParameter['Alkalinity'];
+      const calciumRow = rowByParameter['Calcium hardness'];
+      const cyaRow = rowByParameter['CYA'];
+      const saltRow = rowByParameter['Salt'];
+
+      if (pHRow.current == null || pHRow.target == null) {
+        taskLines.push('Recorded pH result, however the current or target value was not fully entered.');
+      } else if (pHRow.status.label === 'High') {
+        const chemicalSentence = buildChemicalSentence('acid', doses.acid, 'mL', 0, 'to reduce pH toward the target range');
+        taskLines.push(`pH tested high at ${formatNumber(pHRow.current, 2)} against a target of ${formatNumber(pHRow.target, 2)}.${chemicalSentence ? ' ' + chemicalSentence : ' No acid dose was calculated.'}`);
+      } else if (pHRow.status.label === 'Low') {
+        taskLines.push(`pH tested low at ${formatNumber(pHRow.current, 2)} against a target of ${formatNumber(pHRow.target, 2)}. No acid dose was recommended from this calculator.`);
+      } else {
+        taskLines.push(`pH tested within target range at ${formatNumber(pHRow.current, 2)}.`);
+      }
+
+      if (fcRow.current == null || fcRow.target == null) {
+        taskLines.push('Recorded free chlorine result, however the current or target value was not fully entered.');
+      } else if (fcRow.status.label === 'Low') {
+        const chemicalSentence = buildChemicalSentence('chlorine', doses.chlorine, 'mL', 0, 'to raise free chlorine toward the target range');
+        taskLines.push(`Free chlorine tested low at ${formatNumber(fcRow.current, 2)} ppm against a target of ${formatNumber(fcRow.target, 2)} ppm.${chemicalSentence ? ' ' + chemicalSentence : ''}`);
+      } else if (fcRow.status.label === 'High') {
+        taskLines.push(`Free chlorine tested above target at ${formatNumber(fcRow.current, 2)} ppm against a target of ${formatNumber(fcRow.target, 2)} ppm. No chlorine dose was recommended.`);
+      } else {
+        taskLines.push(`Free chlorine tested within target range at ${formatNumber(fcRow.current, 2)} ppm.`);
+      }
+
+      if (alkRow.current == null || alkRow.target == null) {
+        taskLines.push('Recorded alkalinity result, however the current or target value was not fully entered.');
+      } else if (alkRow.status.label === 'Low') {
+        const chemicalSentence = buildChemicalSentence('bicarb', doses.bicarb, 'kg', 2, 'to raise alkalinity toward the target range');
+        taskLines.push(`Alkalinity tested low at ${formatNumber(alkRow.current, 0)} ppm against a target of ${formatNumber(alkRow.target, 0)} ppm.${chemicalSentence ? ' ' + chemicalSentence : ''}`);
+      } else if (alkRow.status.label === 'High') {
+        taskLines.push(`Alkalinity tested above target at ${formatNumber(alkRow.current, 0)} ppm against a target of ${formatNumber(alkRow.target, 0)} ppm. No bicarbonate dose was recommended.`);
+      } else {
+        taskLines.push(`Alkalinity tested within target range at ${formatNumber(alkRow.current, 0)} ppm.`);
+      }
+
+      if (calciumRow.current == null || calciumRow.target == null) {
+        taskLines.push('Recorded calcium hardness result, however the current or target value was not fully entered.');
+      } else if (calciumRow.status.label === 'Low') {
+        const chemicalSentence = buildChemicalSentence('calcium', doses.calcium, 'kg', 2, 'to raise calcium hardness toward the target range');
+        taskLines.push(`Calcium hardness tested low at ${formatNumber(calciumRow.current, 0)} ppm against a target of ${formatNumber(calciumRow.target, 0)} ppm.${chemicalSentence ? ' ' + chemicalSentence : ''}`);
+      } else if (calciumRow.status.label === 'High') {
+        taskLines.push(`Calcium hardness tested above target at ${formatNumber(calciumRow.current, 0)} ppm against a target of ${formatNumber(calciumRow.target, 0)} ppm.`);
+      } else {
+        taskLines.push(`Calcium hardness tested within target range at ${formatNumber(calciumRow.current, 0)} ppm.`);
+      }
+
+      if (cyaRow.current == null || cyaRow.target == null) {
+        taskLines.push('Recorded CYA result, however the current or target value was not fully entered.');
+      } else if (Number(cyaRow.target) === 0) {
+        if (cyaRow.current > 10) {
+          taskLines.push(`CYA was recorded at ${formatNumber(cyaRow.current, 0)} ppm with a zero target. Stabiliser should be kept out unless otherwise required.`);
+        } else {
+          taskLines.push(`CYA was recorded at ${formatNumber(cyaRow.current, 0)} ppm and remains within the zero target tolerance.`);
+        }
+      } else if (cyaRow.status.label === 'Low') {
+        taskLines.push(`CYA tested low at ${formatNumber(cyaRow.current, 0)} ppm against a target of ${formatNumber(cyaRow.target, 0)} ppm. Manual stabiliser adjustment may be required if used on site.`);
+      } else if (cyaRow.status.label === 'High') {
+        taskLines.push(`CYA tested above target at ${formatNumber(cyaRow.current, 0)} ppm against a target of ${formatNumber(cyaRow.target, 0)} ppm.`);
+      } else {
+        taskLines.push(`CYA tested within target range at ${formatNumber(cyaRow.current, 0)} ppm.`);
+      }
+
+      if (saltRow.current == null || saltRow.target == null) {
+        taskLines.push('Recorded salt result, however the current or target value was not fully entered.');
+      } else if (saltRow.status.label === 'Low') {
+        const chemicalSentence = buildChemicalSentence('salt', doses.salt, 'kg', 2, 'to raise salinity toward the target range');
+        taskLines.push(`Salt tested low at ${formatNumber(saltRow.current, 0)} ppm against a target of ${formatNumber(saltRow.target, 0)} ppm.${chemicalSentence ? ' ' + chemicalSentence : ''}`);
+      } else if (saltRow.status.label === 'High') {
+        taskLines.push(`Salt tested above target at ${formatNumber(saltRow.current, 0)} ppm against a target of ${formatNumber(saltRow.target, 0)} ppm.`);
+      } else {
+        taskLines.push(`Salt tested within target range at ${formatNumber(saltRow.current, 0)} ppm.`);
+      }
+
+      if (Number.isFinite(phosphates)) {
+        taskLines.push(`Recorded phosphates at ${formatNumber(phosphates, 0)} ppb.`);
+      }
+
+      ['acid', 'chlorine', 'bicarb', 'calcium', 'salt'].forEach(key => {
+        const amount = Number(doses[key]) || 0;
+        const snapshot = getDoseFieldSnapshot(key);
+        const alreadyMentioned = (
+          (key === 'acid' && pHRow.status.label === 'High' && amount > 0) ||
+          (key === 'chlorine' && fcRow.status.label === 'Low' && amount > 0) ||
+          (key === 'bicarb' && alkRow.status.label === 'Low' && amount > 0) ||
+          (key === 'calcium' && calciumRow.status.label === 'Low' && amount > 0) ||
+          (key === 'salt' && saltRow.status.label === 'Low' && amount > 0)
+        );
+
+        if (!alreadyMentioned && (snapshot.status === 'yes' || snapshot.note)) {
+          const decimals = key === 'acid' || key === 'chlorine' ? 0 : 2;
+          const unit = key === 'acid' || key === 'chlorine' ? 'mL' : 'kg';
+          const sentence = buildChemicalSentence(key, amount, unit, decimals, '');
+          if (sentence) taskLines.push(sentence);
+        }
+      });
+
+      taskLines.forEach(line => lines.push(`- ${line}`));
+      lines.push('');
+      lines.push('Notes:');
+
+      const notesLines = [];
+      const statuses = rows.map(row => row.status.label);
+      if (statuses.includes('Missing')) {
+        notesLines.push('Some readings or targets were incomplete, so recommendations should be checked once all results are entered.');
+      } else if (statuses.includes('High') || statuses.includes('Low')) {
+        notesLines.push('Retest after any chemical additions and confirm all values are back within target range.');
+      } else {
+        notesLines.push('System was operating within the entered target ranges at the time of testing.');
+      }
+      if (serviceNotes) notesLines.push(serviceNotes);
+      notesLines.forEach(line => lines.push(`- ${line}`));
+
+      return lines;
+    }
+
+    function buildReportText() {
+      return buildReportLines().join('\n');
     }
 
     function renderReport() {
@@ -1157,7 +1337,7 @@
         try {
           if (!navigator.canShare || navigator.canShare({ files: [file] })) {
             await navigator.share({
-              title: 'Water Quality Testing Report',
+              title: 'Service Report',
               text: 'Pool service report',
               files: [file]
             });
@@ -1206,35 +1386,30 @@
       doc.setDrawColor(210, 225, 241);
       doc.setFillColor(245, 250, 255);
       doc.roundedRect(8, 8, pageWidth - 16, pageHeight - 16, 5, 5, 'S');
-      addLine('MBS FM Water Quality Testing Report', 18, 'bold');
-      addLine(`${inputs.reportSite.value || ''} - ${inputs.reportPoolName.value || ''}`, 12, 'bold');
-      addLine(`Technician: ${inputs.reportTechnician.value || ''}    Date: ${inputs.reportDate.value || ''}    Time: ${inputs.testTime.value || ''}`, 10, 'normal');
-      addLine(`Water clarity: ${inputs.waterClarity.value || ''}    Volume: ${formatNumber(getActiveVolume(), 0)} L`, 10, 'normal');
-      addLine('', 6);
-      addLine('Combined water balance and dosing', 13, 'bold');
+      const reportLines = buildReportLines();
+      reportLines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          addLine('', 6);
+          return;
+        }
 
-      const { rows, doses } = buildRecommendationRows();
-      rows.forEach(row => {
-        addLine(`${row.parameter}: current ${row.current == null ? '-' : formatNumber(row.current, row.decimals)} | target ${row.target == null ? '-' : formatNumber(row.target, row.decimals)} | ${row.status.label} | ${row.action}`, 10, 'normal');
+        const isMainTitle = index === 0;
+        const isSectionHeading = [
+          'SERVICE SUMMARY',
+          'TEST RESULTS',
+          'CHEMICAL DOSING',
+          'SERVICE NOTES'
+        ].includes(trimmed);
+
+        if (isMainTitle) {
+          addLine(trimmed, 18, 'bold');
+        } else if (isSectionHeading) {
+          addLine(trimmed, 13, 'bold');
+        } else {
+          addLine(trimmed, 10, 'normal');
+        }
       });
-
-      addLine('', 6);
-      addLine('Chemical dosing checklist', 13, 'bold');
-      [
-        { key: 'acid', value: doses.acid, unit: 'mL', decimals: 0 },
-        { key: 'chlorine', value: doses.chlorine, unit: 'mL', decimals: 0 },
-        { key: 'bicarb', value: doses.bicarb, unit: 'kg', decimals: 2 },
-        { key: 'calcium', value: doses.calcium, unit: 'kg', decimals: 2 },
-        { key: 'salt', value: doses.salt, unit: 'kg', decimals: 2 }
-      ].forEach(item => {
-        const statusField = qs(`doseStatus_${item.key}`);
-        const noteField = qs(`doseNote_${item.key}`);
-        addLine(`${chemicalNames[item.key]}: ${formatDose(item.value, item.unit, item.decimals)} | Dosed: ${(statusField && statusField.value) || 'No'}${noteField && noteField.value ? ` | Note: ${noteField.value}` : ''}`, 10, 'normal');
-      });
-
-      addLine('', 6);
-      addLine('Service notes', 13, 'bold');
-      addLine(inputs.serviceNotes.value || '-', 10, 'normal');
 
       const filenameBase = (inputs.reportPoolName.value || 'pool-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'pool-report'}-${inputs.reportDate.value || 'report'}.pdf`;
@@ -1283,7 +1458,7 @@
       setDefaultDateTime();
       loadPoolDefaults();
       renderCombinedTable();
-      qs('reportOutput').textContent = 'Tap Generate report to build the service summary.';
+      qs('reportOutput').textContent = 'Tap Generate report to build the service report.';
     }
 
     function handleInputChange() {
