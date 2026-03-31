@@ -324,11 +324,11 @@
     .report-sheet {
       background: #ffffff;
       color: #0f172a;
-      border: 1px solid #d7e2ef;
-      border-radius: 18px;
+      border: 1px solid #c8d7e6;
+      border-radius: 14px;
       padding: 18px;
-      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
-      min-width: 980px;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+      min-width: 1020px;
     }
 
     .report-sheet * {
@@ -337,47 +337,106 @@
 
     .report-sheet-header {
       display: grid;
-      grid-template-columns: 1.4fr 1fr;
+      grid-template-columns: 1.45fr 0.9fr;
       gap: 16px;
-      align-items: start;
+      align-items: stretch;
       margin-bottom: 14px;
     }
 
-    .report-title {
-      font-size: 28px;
-      font-weight: 800;
-      line-height: 1.1;
-      color: #0f172a;
-      margin-bottom: 10px;
+    .report-brand-card,
+    .report-meta-card {
+      border: 1px solid #a8bfd8;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .report-brand-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 16px 12px;
+      min-height: 98px;
+      background:
+        linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      border-bottom: 1px solid #d7e3ef;
+    }
+
+    .report-logo {
+      display: block;
+      width: min(350px, 60%);
+      max-width: 390px;
+      max-height: 74px;
+      object-fit: contain;
+      flex: 0 0 auto;
+      filter: saturate(1.04) contrast(1.03);
     }
 
     .report-company {
-      font-size: 14px;
-      line-height: 1.5;
+      font-size: 13px;
+      line-height: 1.45;
       color: #334155;
+      text-align: right;
+      padding-left: 10px;
+      border-left: 1px solid #d7e3ef;
     }
 
-    .report-meta-card {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 14px;
+    .report-company strong {
+      display: block;
+      font-size: 15px;
+      color: #003a75;
+      margin-bottom: 3px;
+    }
+
+    .report-brand-strip {
+      background: linear-gradient(90deg, #003a75 0%, #00498f 45%, #0059ad 100%);
+      padding: 12px 16px 13px;
+      border-top: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .report-title {
+      font-size: 25px;
+      font-weight: 800;
+      line-height: 1.1;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .report-meta-head {
+      background: linear-gradient(180deg, #003a75 0%, #0059ad 100%);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 11px 14px;
+      border-bottom: 1px solid #d7e6f3;
+    }
+
+    .report-meta-body {
       padding: 14px;
-      color: #0f172a;
     }
 
     .report-meta-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px 14px;
+      gap: 12px 14px;
+    }
+
+    .report-meta-item.full {
+      grid-column: 1 / -1;
     }
 
     .report-meta-item .label {
       display: block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.03em;
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      color: #1e3a8a;
+      color: #003a75;
       margin-bottom: 4px;
     }
 
@@ -388,24 +447,31 @@
       color: #111827;
     }
 
-    .report-table-title {
-      margin: 14px 0 8px;
-      font-size: 15px;
+    .report-section-bar {
+      margin: 14px 0 0;
+      padding: 8px 12px 9px;
+      font-size: 13px;
       font-weight: 800;
-      color: #0f172a;
+      letter-spacing: 0.02em;
+      color: #ffffff;
+      background: linear-gradient(90deg, #003a75 0%, #00498f 45%, #0059ad 100%);
+      border-radius: 10px 10px 0 0;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
     }
 
     .report-table {
       width: 100%;
       min-width: 0;
       border-collapse: collapse;
-      margin-bottom: 12px;
+      margin: 0 0 14px;
       background: #ffffff;
+      border: 1px solid #a9c0d7;
+      border-top: 0;
     }
 
     .report-table th,
     .report-table td {
-      border: 1px solid #cfd9e6;
+      border: 1px solid #c8d8e7;
       padding: 7px 8px;
       font-size: 12px;
       vertical-align: top;
@@ -414,10 +480,15 @@
     }
 
     .report-table th {
-      background: #f8fafc;
-      color: #1e3a8a;
+      background: #003a75;
+      color: #ffffff;
       font-weight: 800;
       white-space: nowrap;
+      border-color: #7aa7d3;
+    }
+
+    .report-table tbody tr:nth-child(even) td {
+      background: #f7fbff;
     }
 
     .report-table.tight th,
@@ -432,12 +503,30 @@
       text-align: left;
     }
 
+    .report-sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
     .report-section-block {
-      border: 1px solid #d7e2ef;
-      border-radius: 14px;
+      border: 1px solid #a8bfd8;
+      border-radius: 12px;
       background: #ffffff;
-      padding: 12px;
-      margin-top: 10px;
+      overflow: hidden;
+      margin-top: 0;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+    }
+
+    .report-section-block-title {
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: #ffffff;
+      background: linear-gradient(180deg, #003a75 0%, #0059ad 100%);
+      border-bottom: 1px solid #d7e6f3;
     }
 
     .report-paragraph {
@@ -445,16 +534,21 @@
       line-height: 1.55;
       color: #1f2937;
       white-space: pre-wrap;
+      padding: 12px;
+      min-height: 88px;
     }
 
     .report-footer {
       margin-top: 10px;
+      padding-top: 8px;
       font-size: 11px;
       color: #64748b;
       text-align: right;
+      border-top: 1px solid #d7e6f3;
     }
 
     .kpi-wrap {
+
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       gap: 10px;
@@ -837,6 +931,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script>
+    const REPORT_LOGO_DATA = 'data:image/png;base64,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';
+    const REPORT_BLUE = '#003A75';
+    const REPORT_BLUE_ACCENT = '#0059AD';
     const STORAGE_KEY = 'mbs-pool-dosing-combined-v2';
 
     const POOLS = [
@@ -1474,44 +1571,55 @@
       return lines.join('\n');
     }
 
-    function buildReportHtml() {
+    
+function buildReportHtml() {
       const model = buildReportModel();
       return `
         <div class="report-sheet">
           <div class="report-sheet-header">
-            <div>
-              <div class="report-title">${escapeHtml(model.title)}</div>
-              <div class="report-company">
-                <strong>${escapeHtml(model.companyName)}</strong><br>
-                ${model.companyLines.map(line => escapeHtml(line)).join('<br>')}
+            <div class="report-brand-card">
+              <div class="report-brand-top">
+                <img class="report-logo" src="${REPORT_LOGO_DATA}" alt="MBS FM logo" />
+                <div class="report-company">
+                  <strong>${escapeHtml(model.companyName)}</strong>
+                  ${model.companyLines.map(line => escapeHtml(line)).join('<br>')}
+                </div>
+              </div>
+              <div class="report-brand-strip">
+                <div class="report-title">${escapeHtml(model.title)}</div>
               </div>
             </div>
+
             <div class="report-meta-card">
-              <div class="report-meta-grid">
-                <div class="report-meta-item">
-                  <span class="label">Site</span>
-                  <span class="value">${escapeHtml(model.site)}</span>
-                </div>
-                <div class="report-meta-item">
-                  <span class="label">Technician</span>
-                  <span class="value">${escapeHtml(model.technician)}</span>
-                </div>
-                <div class="report-meta-item">
-                  <span class="label">Pool / Spa</span>
-                  <span class="value">${escapeHtml(model.poolName)}</span>
-                </div>
-                <div class="report-meta-item">
-                  <span class="label">Date</span>
-                  <span class="value">${escapeHtml(model.date)}</span>
-                </div>
-                <div class="report-meta-item">
-                  <span class="label">Test time</span>
-                  <span class="value">${escapeHtml(model.testTime)}</span>
+              <div class="report-meta-head">Test details</div>
+              <div class="report-meta-body">
+                <div class="report-meta-grid">
+                  <div class="report-meta-item">
+                    <span class="label">Site</span>
+                    <span class="value">${escapeHtml(model.site)}</span>
+                  </div>
+                  <div class="report-meta-item">
+                    <span class="label">Technician</span>
+                    <span class="value">${escapeHtml(model.technician)}</span>
+                  </div>
+                  <div class="report-meta-item full">
+                    <span class="label">Pool / Spa</span>
+                    <span class="value">${escapeHtml(model.poolName)}</span>
+                  </div>
+                  <div class="report-meta-item">
+                    <span class="label">Date</span>
+                    <span class="value">${escapeHtml(model.date)}</span>
+                  </div>
+                  <div class="report-meta-item">
+                    <span class="label">Test time</span>
+                    <span class="value">${escapeHtml(model.testTime)}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
+          <div class="report-section-bar">Water Summary</div>
           <table class="report-table tight">
             <thead>
               <tr>${model.summaryItems.map(item => `<th>${escapeHtml(item.label)}</th>`).join('')}</tr>
@@ -1521,7 +1629,7 @@
             </tbody>
           </table>
 
-          <div class="report-table-title">Water Test Results</div>
+          <div class="report-section-bar">Water Test Results</div>
           <table class="report-table">
             <thead>
               <tr>
@@ -1547,14 +1655,16 @@
             </tbody>
           </table>
 
-          <div class="report-section-block">
-            <div class="report-table-title" style="margin-top: 0;">Chemicals Added</div>
-            <div class="report-paragraph">${escapeHtml(model.chemicalsAddedText)}</div>
-          </div>
+          <div class="report-sections-grid">
+            <div class="report-section-block">
+              <div class="report-section-block-title">Chemicals Added</div>
+              <div class="report-paragraph">${escapeHtml(model.chemicalsAddedText)}</div>
+            </div>
 
-          <div class="report-section-block">
-            <div class="report-table-title" style="margin-top: 0;">Corrective Action / Technician Notes</div>
-            <div class="report-paragraph">${escapeHtml(model.correctiveActionsText)}</div>
+            <div class="report-section-block">
+              <div class="report-section-block-title">Corrective Action / Technician Notes</div>
+              <div class="report-paragraph">${escapeHtml(model.correctiveActionsText)}</div>
+            </div>
           </div>
 
           <div class="report-footer">${escapeHtml(model.footerText)}</div>
@@ -1594,7 +1704,8 @@
       return true;
     }
 
-    function drawTable(doc, startX, startY, columnWidths, headers, rows, options = {}) {
+    
+function drawTable(doc, startX, startY, columnWidths, headers, rows, options = {}) {
       const pageHeight = doc.internal.pageSize.getHeight();
       const marginBottom = options.marginBottom || 12;
       const baseFontSize = options.fontSize || 8.5;
@@ -1608,7 +1719,7 @@
         }
       };
 
-      const drawRow = (cells, isHeader = false) => {
+      const drawRow = (cells, isHeader = false, rowIndex = 0) => {
         doc.setFont('helvetica', isHeader ? 'bold' : 'normal');
         doc.setFontSize(isHeader ? headerFontSize : baseFontSize);
 
@@ -1622,21 +1733,35 @@
 
         let x = startX;
         splitCells.forEach((lines, idx) => {
-          doc.setDrawColor(207, 217, 230);
-          doc.setFillColor(isHeader ? 248 : 255, isHeader ? 250 : 255, isHeader ? 252 : 255);
-          doc.rect(x, y, columnWidths[idx], rowHeight, isHeader ? 'FD' : 'S');
+          const isStriped = !isHeader && options.striped && rowIndex % 2 === 1;
+          if (isHeader) {
+            doc.setDrawColor(142, 184, 223);
+            doc.setFillColor(0, 84, 166);
+            doc.setTextColor(255, 255, 255);
+          } else if (isStriped) {
+            doc.setDrawColor(200, 216, 231);
+            doc.setFillColor(247, 251, 255);
+            doc.setTextColor(15, 23, 42);
+          } else {
+            doc.setDrawColor(200, 216, 231);
+            doc.setFillColor(255, 255, 255);
+            doc.setTextColor(15, 23, 42);
+          }
+          doc.rect(x, y, columnWidths[idx], rowHeight, 'FD');
           doc.text(lines, x + 1.5, y + 4);
           x += columnWidths[idx];
         });
         y += rowHeight;
+        doc.setTextColor(0, 0, 0);
       };
 
       drawRow(headers, true);
-      rows.forEach(row => drawRow(row, false));
+      rows.forEach((row, idx) => drawRow(row, false, idx));
       return y;
     }
 
-    async function savePdfReport() {
+    
+async function savePdfReport() {
       renderReport();
       if (!window.jspdf || !window.jspdf.jsPDF) {
         alert('PDF library did not load. Please refresh and try again.');
@@ -1649,6 +1774,10 @@
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 10;
+      const blue = [0, 58, 117];
+      const blueAccent = [0, 89, 173];
+      const lightBlue = [233, 241, 250];
+      const borderBlue = [168, 191, 216];
 
       const addWrappedText = (text, x, y, width, fontSize = 8.5, weight = 'normal') => {
         doc.setFont('helvetica', weight);
@@ -1658,67 +1787,94 @@
         return y + (lines.length * (fontSize * 0.45)) + 2;
       };
 
-      doc.setDrawColor(210, 225, 241);
+      const drawSectionBar = (title, yPos) => {
+        doc.setFillColor(...blue);
+        doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 7.5, 2.2, 2.2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(title, margin + 3, yPos + 5);
+        doc.setTextColor(0, 0, 0);
+        return yPos + 8.5;
+      };
+
+      doc.setDrawColor(...borderBlue);
       doc.roundedRect(6, 6, pageWidth - 12, pageHeight - 12, 4, 4, 'S');
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(17);
-      doc.text(model.title, margin, 18);
+      const metaW = 78;
+      const gap = 8;
+      const brandX = margin;
+      const brandY = 10;
+      const brandW = pageWidth - (margin * 2) - metaW - gap;
+      const brandH = 36;
+
+      doc.setDrawColor(...borderBlue);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(brandX, brandY, brandW, brandH, 3, 3, 'FD');
+
+      try {
+        doc.addImage(REPORT_LOGO_DATA, 'PNG', brandX + 4.5, brandY + 3.5, 54, 18);
+      } catch (error) {
+        console.warn('Report logo failed to load for PDF', error);
+      }
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.text(model.companyName, margin, 26);
+      doc.setTextColor(...blue);
+      doc.setFontSize(9.4);
+      doc.text(model.companyName, brandX + brandW - 5, brandY + 7, { align: 'right' });
+
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      let companyY = 31;
+      doc.setTextColor(51, 65, 85);
+      doc.setFontSize(7.7);
+      let companyY = brandY + 11.5;
       model.companyLines.forEach(line => {
-        doc.text(line, margin, companyY);
-        companyY += 4.5;
+        doc.text(line, brandX + brandW - 5, companyY, { align: 'right' });
+        companyY += 3.8;
       });
 
-      const cardX = pageWidth - 92;
-      const cardY = 12;
-      const cardW = 78;
-      const cardH = 34;
-      doc.setDrawColor(203, 213, 225);
+      doc.setFillColor(...blue);
+      doc.roundedRect(brandX, brandY + brandH - 12, brandW, 12, 0, 0, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16.5);
+      doc.text(model.title, brandX + 5, brandY + brandH - 4);
+      doc.setTextColor(0, 0, 0);
+
+      const cardX = brandX + brandW + gap;
+      const cardY = brandY;
+      const cardH = brandH;
+      doc.setDrawColor(...borderBlue);
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(cardX, cardY, cardW, cardH, 3, 3, 'FD');
+      doc.roundedRect(cardX, cardY, metaW, cardH, 3, 3, 'FD');
+      doc.setFillColor(...blue);
+      doc.roundedRect(cardX, cardY, metaW, 7, 3, 3, 'F');
+      doc.rect(cardX, cardY + 4, metaW, 3, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.6);
+      doc.setTextColor(255, 255, 255);
+      doc.text('TEST DETAILS', cardX + 4, cardY + 4.7);
 
       const metaItems = [
-        ['Site', model.site],
-        ['Technician', model.technician],
-        ['Pool / Spa', model.poolName],
-        ['Date', model.date],
-        ['Test time', model.testTime]
+        ['Site', model.site, cardX + 4, cardY + 12],
+        ['Technician', model.technician, cardX + 41, cardY + 12],
+        ['Pool / Spa', model.poolName, cardX + 4, cardY + 22],
+        ['Date', model.date, cardX + 41, cardY + 22],
+        ['Test time', model.testTime, cardX + 4, cardY + 30.5]
       ];
-      let metaX = cardX + 4;
-      let metaY = cardY + 6;
-      metaItems.forEach((item, idx) => {
-        if (idx === 2) {
-          metaX = cardX + 4;
-          metaY = cardY + 20;
-        } else if (idx === 1) {
-          metaX = cardX + 41;
-          metaY = cardY + 6;
-        } else if (idx === 3) {
-          metaX = cardX + 41;
-          metaY = cardY + 20;
-        } else if (idx === 4) {
-          metaX = cardX + 4;
-          metaY = cardY + 28;
-        }
+      metaItems.forEach(([label, value, x, y]) => {
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 58, 138);
-        doc.setFontSize(6.8);
-        doc.text(item[0], metaX, metaY);
+        doc.setTextColor(...blue);
+        doc.setFontSize(6.6);
+        doc.text(label, x, y);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(17, 24, 39);
-        doc.setFontSize(7.8);
-        doc.text(String(item[1] || '-').slice(0, idx === 2 ? 26 : 22), metaX, metaY + 3.4);
+        doc.setFontSize(7.7);
+        doc.text(doc.splitTextToSize(String(value || '-'), label === 'Pool / Spa' ? 32 : 28), x, y + 3.2);
       });
       doc.setTextColor(0, 0, 0);
 
-      let y = 52;
+      let y = 51;
+      y = drawSectionBar('Water Summary', y);
       const summaryWidths = Array(12).fill((pageWidth - (margin * 2)) / 12);
       y = drawTable(
         doc,
@@ -1727,36 +1883,48 @@
         summaryWidths,
         model.summaryItems.map(item => item.label),
         [model.summaryItems.map(item => item.value)],
-        { fontSize: 7.3, headerFontSize: 7.3 }
+        { fontSize: 7.3, headerFontSize: 7.3, striped: false }
       );
 
-      y += 6;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text('Water Test Results', margin, y);
-      y += 3;
+      y += 4;
+      y = drawSectionBar('Water Test Results', y);
       const chemicalRows = model.chemicalRows.map(row => [row.name, row.qty, row.unit, row.reason, row.dosed, row.notes]);
       y = drawTable(
         doc,
         margin,
-        y + 2,
+        y,
         [60, 18, 16, 54, 18, pageWidth - (margin * 2) - 60 - 18 - 16 - 54 - 18],
         ['Chemical used', 'Qty', 'Unit', 'Reason', 'Dosed?', 'Notes'],
         chemicalRows,
-        { fontSize: 7.8, headerFontSize: 7.8 }
+        { fontSize: 7.8, headerFontSize: 7.8, striped: true }
       );
 
-      y += 8;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text('Chemicals Added', margin, y);
-      y = addWrappedText(model.chemicalsAddedText, margin, y + 5, pageWidth - (margin * 2), 8.5, 'normal');
+      const blockGap = 6;
+      const blockY = y + 6;
+      const blockW = ((pageWidth - (margin * 2)) - blockGap) / 2;
+      const leftBlockX = margin;
+      const rightBlockX = margin + blockW + blockGap;
 
-      y += 3;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text('Corrective Action / Technician Notes', margin, y);
-      y = addWrappedText(model.correctiveActionsText, margin, y + 5, pageWidth - (margin * 2), 8.5, 'normal');
+      const drawTextBlock = (x, yPos, w, title, body) => {
+        doc.setDrawColor(...borderBlue);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(x, yPos, w, 30, 2.5, 2.5, 'FD');
+        doc.setFillColor(...blue);
+        doc.roundedRect(x, yPos, w, 7.5, 2.5, 2.5, 'F');
+        doc.rect(x, yPos + 4.5, w, 3, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8.6);
+        doc.text(title, x + 3, yPos + 5);
+        doc.setTextColor(31, 41, 55);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.2);
+        const lines = doc.splitTextToSize(String(body || ''), w - 6);
+        doc.text(lines, x + 3, yPos + 12);
+      };
+
+      drawTextBlock(leftBlockX, blockY, blockW, 'Chemicals Added', model.chemicalsAddedText);
+      drawTextBlock(rightBlockX, blockY, blockW, 'Corrective Action / Technician Notes', model.correctiveActionsText);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
