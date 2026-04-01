@@ -949,6 +949,7 @@
                 <th>Parameter</th>
                 <th>Current</th>
                 <th>Target</th>
+                <th>Normal range</th>
                 <th>Status</th>
                 <th>Recommended action / dose</th>
               </tr>
@@ -958,7 +959,7 @@
         </div>
 
         <div class="hint" style="margin-top: 12px;">
-          This combines the water balance check and the chemical dosing into one section.
+          This combines the water balance check and dosing into one section, and now shows the acceptable range as well as the ideal target.
         </div>
 
         <div class="dose-checklist" id="doseChecklist"></div>
@@ -1209,35 +1210,106 @@
       return Math.max(0, round((delta * volumeL) / 1000000, 2));
     }
 
-    function getStatus(value, target, tolerance, specialZero = false) {
-      if (value == null || target == null) {
+    function getRangeStatus(value, range) {
+      if (value == null || !range) {
         return { label: 'Missing', className: 'status-pill' };
       }
-      if (specialZero && target === 0) {
-        if (value <= tolerance) return { label: 'OK', className: 'status-pill status-good' };
-        return { label: 'High', className: 'status-pill status-bad' };
-      }
-      if (value < target - tolerance) {
+      if (value < range.min) {
         return { label: 'Low', className: 'status-pill status-warn' };
       }
-      if (value > target + tolerance) {
+      if (value > range.max) {
         return { label: 'High', className: 'status-pill status-bad' };
       }
-      return { label: 'OK', className: 'status-pill status-good' };
+      return { label: 'In range', className: 'status-pill status-good' };
     }
 
-    function getPhStatus(value, target) {
-      if (value == null || target == null) return { label: 'Missing', className: 'status-pill' };
-      if (value < target - 0.15) return { label: 'Low', className: 'status-pill status-warn' };
-      if (value > target + 0.15) return { label: 'High', className: 'status-pill status-bad' };
-      return { label: 'OK', className: 'status-pill status-good' };
+    function getRecommendedRange(key, target) {
+      if (target == null) return null;
+
+      if (key === 'ph') {
+        return { min: 7.2, max: 7.8, decimals: 2, label: '7.20 - 7.80' };
+      }
+
+      if (key === 'fc') {
+        const min = Math.max(0, target - 0.5);
+        const max = target + 1.0;
+        return { min, max, decimals: 2, label: `${formatNumber(min, 2)} - ${formatNumber(max, 2)}` };
+      }
+
+      if (key === 'alk') {
+        const min = Math.max(0, target - 20);
+        const max = target + 20;
+        return { min, max, decimals: 0, label: `${formatNumber(min, 0)} - ${formatNumber(max, 0)}` };
+      }
+
+      if (key === 'calcium') {
+        const min = Math.max(0, target - 50);
+        const max = target + 50;
+        return { min, max, decimals: 0, label: `${formatNumber(min, 0)} - ${formatNumber(max, 0)}` };
+      }
+
+      if (key === 'cya') {
+        if (target === 0) {
+          return { min: 0, max: 10, decimals: 0, label: '0 - 10' };
+        }
+        const min = Math.max(0, target - 15);
+        const max = target + 15;
+        return { min, max, decimals: 0, label: `${formatNumber(min, 0)} - ${formatNumber(max, 0)}` };
+      }
+
+      if (key === 'salt') {
+        if (target === 0) {
+          return { min: 0, max: 200, decimals: 0, label: '0 - 200' };
+        }
+        const min = Math.max(0, target - 200);
+        const max = target + 200;
+        return { min, max, decimals: 0, label: `${formatNumber(min, 0)} - ${formatNumber(max, 0)}` };
+      }
+
+      return null;
     }
 
-    function getFcStatus(value, target) {
-      if (value == null || target == null) return { label: 'Missing', className: 'status-pill' };
-      if (value < target) return { label: 'Low', className: 'status-pill status-warn' };
-      if (value > target + 1) return { label: 'High', className: 'status-pill status-bad' };
-      return { label: 'OK', className: 'status-pill status-good' };
+    function isWithinRange(value, range) {
+      return value != null && range && value >= range.min && value <= range.max;
+    }
+
+    function buildDoseGuidance({ current, target, range, dose, unit, doseDecimals = 0, targetDecimals = 0, chemicalLabel, increaseVerb, decreaseVerb, noDoseText, lowText, highText, zeroTargetText }) {
+      if (current == null || target == null || !range) {
+        return 'Enter current and target values.';
+      }
+
+      const withinRange = isWithinRange(current, range);
+      const rangeText = `normal range ${range.label}`;
+
+      if (dose > 0) {
+        const doseText = `add ${formatDose(dose, unit, doseDecimals)} of ${chemicalLabel}`;
+        if (withinRange) {
+          if (decreaseVerb) {
+            return `Within ${rangeText}. Optional: ${doseText} to ${decreaseVerb} back to the target of ${formatNumber(target, targetDecimals)}.`;
+          }
+          return `Within ${rangeText}. Optional: ${doseText} to ${increaseVerb} to the target of ${formatNumber(target, targetDecimals)}.`;
+        }
+        if (current < range.min) {
+          return `${lowText || `Below ${rangeText}.`} ${doseText.charAt(0).toUpperCase() + doseText.slice(1)} to ${increaseVerb} to the target of ${formatNumber(target, targetDecimals)}.`;
+        }
+        return `${highText || `Above ${rangeText}.`} ${doseText.charAt(0).toUpperCase() + doseText.slice(1)} to ${decreaseVerb || increaseVerb} to the target of ${formatNumber(target, targetDecimals)}.`;
+      }
+
+      if (target === 0 && zeroTargetText) {
+        if (withinRange) return `Within ${rangeText}. ${zeroTargetText}`;
+        return `${highText || `Above ${rangeText}.`} ${zeroTargetText}`;
+      }
+
+      if (current < range.min) {
+        return lowText || `Below ${rangeText}. ${noDoseText}`;
+      }
+      if (current > range.max) {
+        return highText || `Above ${rangeText}. ${noDoseText}`;
+      }
+      if (Math.abs(current - target) > 0.0001) {
+        return `Within ${rangeText}. No immediate dose needed, but the ideal target is ${formatNumber(target, targetDecimals)}.`;
+      }
+      return `At target and within ${rangeText}. No dose needed.`;
     }
 
     function buildRecommendationRows() {
@@ -1268,66 +1340,156 @@
         salt: saltDoseKg(volume, current.salt, target.salt)
       };
 
+      const ranges = {
+        ph: getRecommendedRange('ph', target.ph),
+        fc: getRecommendedRange('fc', target.fc),
+        alk: getRecommendedRange('alk', target.alk),
+        calcium: getRecommendedRange('calcium', target.calcium),
+        cya: getRecommendedRange('cya', target.cya),
+        salt: getRecommendedRange('salt', target.salt)
+      };
+
       const rows = [
         {
+          key: 'acid',
           parameter: 'pH',
           current: current.ph,
           target: target.ph,
+          range: ranges.ph,
+          rangeLabel: ranges.ph ? ranges.ph.label : '-',
           decimals: 2,
-          status: getPhStatus(current.ph, target.ph),
-          action: doses.acid > 0
-            ? `Add ${formatDose(doses.acid, 'mL')} of hydrochloric acid 32%`
-            : (current.ph != null && target.ph != null && current.ph < target.ph - 0.15 ? 'Below target. No acid dose.' : 'No dose needed.')
+          status: getRangeStatus(current.ph, ranges.ph),
+          action: buildDoseGuidance({
+            current: current.ph,
+            target: target.ph,
+            range: ranges.ph,
+            dose: doses.acid,
+            unit: 'mL',
+            doseDecimals: 0,
+            targetDecimals: 2,
+            chemicalLabel: 'hydrochloric acid 32%',
+            increaseVerb: 'raise pH',
+            decreaseVerb: 'lower pH',
+            noDoseText: 'No acid dose needed.',
+            lowText: ranges.ph ? `Below normal range ${ranges.ph.label}. No acid dose needed - raise pH by your normal method if required.` : 'No acid dose needed.',
+            highText: ranges.ph ? `Above normal range ${ranges.ph.label}.` : 'High.'
+          })
         },
         {
+          key: 'chlorine',
           parameter: 'Free chlorine',
           current: current.fc,
           target: target.fc,
+          range: ranges.fc,
+          rangeLabel: ranges.fc ? ranges.fc.label : '-',
           decimals: 2,
-          status: getFcStatus(current.fc, target.fc),
-          action: doses.chlorine > 0
-            ? `Add ${formatDose(doses.chlorine, 'mL')} of liquid chlorine 12.5%`
-            : 'No dose needed.'
+          status: getRangeStatus(current.fc, ranges.fc),
+          action: buildDoseGuidance({
+            current: current.fc,
+            target: target.fc,
+            range: ranges.fc,
+            dose: doses.chlorine,
+            unit: 'mL',
+            doseDecimals: 0,
+            targetDecimals: 2,
+            chemicalLabel: 'liquid chlorine 12.5%',
+            increaseVerb: 'raise free chlorine',
+            noDoseText: 'No chlorine increase needed.',
+            highText: ranges.fc ? `Above normal range ${ranges.fc.label}. No chlorine increase needed right now.` : 'No chlorine increase needed.'
+          })
         },
         {
+          key: 'bicarb',
           parameter: 'Alkalinity',
           current: current.alk,
           target: target.alk,
+          range: ranges.alk,
+          rangeLabel: ranges.alk ? ranges.alk.label : '-',
           decimals: 0,
-          status: getStatus(current.alk, target.alk, 10),
-          action: doses.bicarb > 0
-            ? `Add ${formatDose(doses.bicarb, 'kg', 2)} of sodium bicarbonate`
-            : 'No dose needed.'
+          status: getRangeStatus(current.alk, ranges.alk),
+          action: buildDoseGuidance({
+            current: current.alk,
+            target: target.alk,
+            range: ranges.alk,
+            dose: doses.bicarb,
+            unit: 'kg',
+            doseDecimals: 2,
+            targetDecimals: 0,
+            chemicalLabel: 'sodium bicarbonate',
+            increaseVerb: 'raise alkalinity',
+            noDoseText: 'No bicarb dose needed.',
+            highText: ranges.alk ? `Above normal range ${ranges.alk.label}. No bicarb dose needed.` : 'No bicarb dose needed.'
+          })
         },
         {
+          key: 'calcium',
           parameter: 'Calcium hardness',
           current: current.calcium,
           target: target.calcium,
+          range: ranges.calcium,
+          rangeLabel: ranges.calcium ? ranges.calcium.label : '-',
           decimals: 0,
-          status: getStatus(current.calcium, target.calcium, 25),
-          action: doses.calcium > 0
-            ? `Add ${formatDose(doses.calcium, 'kg', 2)} of calcium chloride`
-            : 'No dose needed.'
+          status: getRangeStatus(current.calcium, ranges.calcium),
+          action: buildDoseGuidance({
+            current: current.calcium,
+            target: target.calcium,
+            range: ranges.calcium,
+            dose: doses.calcium,
+            unit: 'kg',
+            doseDecimals: 2,
+            targetDecimals: 0,
+            chemicalLabel: 'calcium chloride',
+            increaseVerb: 'raise calcium hardness',
+            noDoseText: 'No calcium dose needed.',
+            highText: ranges.calcium ? `Above normal range ${ranges.calcium.label}. No calcium dose needed.` : 'No calcium dose needed.'
+          })
         },
         {
+          key: 'stabiliser',
           parameter: 'CYA',
           current: current.cya,
           target: target.cya,
+          range: ranges.cya,
+          rangeLabel: ranges.cya ? ranges.cya.label : '-',
           decimals: 0,
-          status: getStatus(current.cya, target.cya, 10, true),
-          action: doses.stabiliser > 0
-            ? `Add ${formatDose(doses.stabiliser, 'kg', 2)} of stabiliser`
-            : (target.cya === 0 ? 'Target is zero. Keep stabiliser out unless needed.' : 'No dose needed.')
+          status: getRangeStatus(current.cya, ranges.cya),
+          action: buildDoseGuidance({
+            current: current.cya,
+            target: target.cya,
+            range: ranges.cya,
+            dose: doses.stabiliser,
+            unit: 'kg',
+            doseDecimals: 2,
+            targetDecimals: 0,
+            chemicalLabel: 'stabiliser',
+            increaseVerb: 'raise CYA',
+            noDoseText: 'No stabiliser dose needed.',
+            zeroTargetText: 'Target is effectively zero, so keep stabiliser out unless specifically required.'
+          })
         },
         {
+          key: 'salt',
           parameter: 'Salt',
           current: current.salt,
           target: target.salt,
+          range: ranges.salt,
+          rangeLabel: ranges.salt ? ranges.salt.label : '-',
           decimals: 0,
-          status: getStatus(current.salt, target.salt, 200, true),
-          action: doses.salt > 0
-            ? `Add ${formatDose(doses.salt, 'kg', 2)} of pool salt`
-            : 'No dose needed.'
+          status: getRangeStatus(current.salt, ranges.salt),
+          action: buildDoseGuidance({
+            current: current.salt,
+            target: target.salt,
+            range: ranges.salt,
+            dose: doses.salt,
+            unit: 'kg',
+            doseDecimals: 2,
+            targetDecimals: 0,
+            chemicalLabel: 'pool salt',
+            increaseVerb: 'raise salt',
+            noDoseText: 'No salt dose needed.',
+            zeroTargetText: 'Salt is not required for this setup.',
+            highText: ranges.salt ? `Above normal range ${ranges.salt.label}. No extra salt needed.` : 'No extra salt needed.'
+          })
         }
       ];
 
@@ -1345,6 +1507,7 @@
           <td><strong>${row.parameter}</strong></td>
           <td>${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</td>
           <td>${row.target == null ? '-' : formatNumber(row.target, row.decimals)}</td>
+          <td>${row.rangeLabel || '-'}</td>
           <td><span class="${row.status.className}">${row.status.label}</span></td>
           <td>${row.action}</td>
         `;
