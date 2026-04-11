@@ -841,16 +841,106 @@
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
 
+    .icebath-combined-cards {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .icebath-combined-card {
+      border: 1px solid rgba(137, 183, 226, 0.18);
+      border-radius: 18px;
+      padding: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,249,255,0.92) 100%);
+    }
+
+    .icebath-combined-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .icebath-combined-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #1c4771;
+    }
+
+    .icebath-combined-dose {
+      font-size: 15px;
+      font-weight: 800;
+      color: #17324d;
+    }
+
+    .icebath-combined-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .icebath-combined-summary {
+      font-size: 13px;
+      line-height: 1.45;
+      color: #244d77;
+      border: 1px solid rgba(141, 189, 232, 0.22);
+      border-radius: 14px;
+      padding: 9px 10px;
+      background: linear-gradient(180deg, rgba(250,253,255,0.96) 0%, rgba(243,248,253,0.96) 100%);
+      margin-bottom: 8px;
+    }
+
+    .icebath-reference-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .icebath-reference-card {
+      border: 1px solid rgba(137, 183, 226, 0.18);
+      border-radius: 16px;
+      padding: 10px;
+      background: rgba(255,255,255,0.9);
+    }
+
+    .icebath-reference-card strong {
+      display: block;
+      font-size: 13px;
+      color: #1c4771;
+      margin-bottom: 4px;
+    }
+
+    .icebath-reference-value {
+      font-size: 18px;
+      font-weight: 800;
+      color: #17324d;
+      line-height: 1.1;
+    }
+
+    .icebath-reference-note {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+
     @media (max-width: 640px) {
       .icebath-result-grid,
-      .icebath-dose-grid {
+      .icebath-dose-grid,
+      .icebath-combined-meta {
         grid-template-columns: 1fr 1fr;
       }
     }
 
     @media (max-width: 420px) {
       .icebath-result-grid,
-      .icebath-dose-grid {
+      .icebath-dose-grid,
+      .icebath-combined-meta,
+      .icebath-reference-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -2240,59 +2330,68 @@
       const { rec, rows, doses } = buildIceBathRecommendationRows(index);
       const doseCount = Object.values(doses).filter(value => Number.isFinite(value) && value > 0).length;
       const chemicalRows = buildIceBathChemicalRows(index, doses);
+      const chemicalByKey = Object.fromEntries(chemicalRows.map(item => [item.key, item]));
+      const resultByParameter = Object.fromEntries(rows.map(row => [row.parameter, row]));
+      const combinedRows = [
+        { result: resultByParameter['pH'], chemical: chemicalByKey.acid },
+        { result: resultByParameter['Free chlorine'], chemical: chemicalByKey.chlorine },
+        { result: resultByParameter['Alkalinity'], chemical: chemicalByKey.bicarb },
+        { result: resultByParameter['Calcium hardness'], chemical: chemicalByKey.calcium }
+      ].filter(item => item.result && item.chemical);
+      const referenceRows = rows.filter(row => ['Total chlorine', 'Temperature', 'Phosphates'].includes(row.parameter));
       target.innerHTML = `
         <div class="mini-pill"><strong>Volume</strong>6,000 L each</div>
         <div class="mini-pill"><strong>Clarity</strong>${escapeHtml(rec.clarity)}</div>
         <div class="mini-pill"><strong>Dose items</strong>${doseCount}</div>
         <div class="mini-pill"><strong>Targets</strong>pH ${formatNumber(rec.targetPh, 2)} | FC ${formatNumber(rec.targetFc, 2)} | Alk ${formatNumber(rec.targetAlk, 0)} | Cal ${formatNumber(rec.targetCalcium, 0)}</div>
-        <div class="icebath-result-cards">
-          ${rows.map(row => `
-            <div class="icebath-result-card">
-              <div class="icebath-result-head">
-                <div class="icebath-result-name">${escapeHtml(row.parameter)}</div>
-                <span class="${row.status.className}">${escapeHtml(row.status.label)}</span>
+        <div class="icebath-combined-cards">
+          ${combinedRows.map(item => `
+            <div class="icebath-combined-card">
+              <div class="icebath-combined-head">
+                <div class="icebath-combined-title">${escapeHtml(item.chemical.label)}</div>
+                <div class="icebath-combined-dose">${formatDose(item.chemical.value, item.chemical.unit, item.chemical.decimals)}</div>
               </div>
-              <div class="icebath-result-grid">
-                <div class="mini-pill"><strong>Current</strong>${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</div>
-                <div class="mini-pill"><strong>Target</strong>${row.target == null ? '-' : formatNumber(row.target, row.decimals)}</div>
-                <div class="mini-pill"><strong>Normal range</strong>${escapeHtml(row.rangeLabel || '-')}</div>
+              <div class="icebath-combined-meta">
+                <div class="mini-pill"><strong>Status</strong>${escapeHtml(item.result.status.label)}</div>
+                <div class="mini-pill"><strong>Current</strong>${item.result.current == null ? '-' : formatNumber(item.result.current, item.result.decimals)}</div>
+                <div class="mini-pill"><strong>Target</strong>${item.result.target == null ? '-' : formatNumber(item.result.target, item.result.decimals)}</div>
+                <div class="mini-pill"><strong>Range</strong>${escapeHtml(item.result.rangeLabel || '-')}</div>
               </div>
-              <div class="icebath-action">${escapeHtml(row.action)}</div>
-            </div>
-          `).join('')}
-        </div>
-        <div class="icebath-chemical-cards">
-          ${chemicalRows.map(item => `
-            <div class="dose-row icebath-dose-row">
-              <div class="dose-row-top">
-                <div class="dose-row-name">${escapeHtml(item.label)}</div>
-                <div class="dose-row-amount">${formatDose(item.value, item.unit, item.decimals)}</div>
-              </div>
+              <div class="icebath-combined-summary">${escapeHtml(item.result.action)}</div>
               <div class="dose-row-grid icebath-dose-grid">
                 <div class="field">
-                  <label for="iceBath${index}DoseStatus_${item.key}">Dosed?</label>
-                  <select id="iceBath${index}DoseStatus_${item.key}">
+                  <label for="iceBath${index}DoseStatus_${item.chemical.key}">Dosed?</label>
+                  <select id="iceBath${index}DoseStatus_${item.chemical.key}">
                     <option value="No">No</option>
                     <option value="Yes">Yes</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="iceBath${index}DoseSource_${item.key}">Stock source</label>
-                  <select id="iceBath${index}DoseSource_${item.key}">
+                  <label for="iceBath${index}DoseSource_${item.chemical.key}">Stock source</label>
+                  <select id="iceBath${index}DoseSource_${item.chemical.key}">
                     <option value="">Select</option>
                     <option value="ute">Ute stock</option>
                     <option value="onsite">Stock onsite</option>
                   </select>
                 </div>
                 <div class="field">
-                  <label for="iceBath${index}DoseActual_${item.key}">Actual qty used</label>
-                  <input id="iceBath${index}DoseActual_${item.key}" type="number" step="any" inputmode="decimal" placeholder="Optional override" />
+                  <label for="iceBath${index}DoseActual_${item.chemical.key}">Actual qty used</label>
+                  <input id="iceBath${index}DoseActual_${item.chemical.key}" type="number" step="any" inputmode="decimal" placeholder="Optional override" />
                 </div>
                 <div class="field">
-                  <label for="iceBath${index}DoseNote_${item.key}">Note</label>
-                  <input id="iceBath${index}DoseNote_${item.key}" type="text" placeholder="Optional note" />
+                  <label for="iceBath${index}DoseNote_${item.chemical.key}">Note</label>
+                  <input id="iceBath${index}DoseNote_${item.chemical.key}" type="text" placeholder="Optional note" />
                 </div>
               </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="icebath-reference-grid">
+          ${referenceRows.map(row => `
+            <div class="icebath-reference-card">
+              <strong>${escapeHtml(row.parameter)}</strong>
+              <div class="icebath-reference-value">${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</div>
+              <div class="icebath-reference-note">${escapeHtml(row.action)}</div>
             </div>
           `).join('')}
         </div>
