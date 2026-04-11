@@ -872,6 +872,157 @@
       margin-top: 6px;
     }
 
+
+
+    .app-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0 0 14px;
+      padding: 10px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(246,250,255,0.9) 100%);
+      border: 1px solid rgba(133, 184, 232, 0.20);
+      box-shadow: var(--shadow);
+    }
+
+    .tab-btn {
+      border: 1px solid rgba(133, 184, 232, 0.22);
+      background: rgba(255,255,255,0.86);
+      color: #1e4f81;
+      border-radius: 999px;
+      min-height: 44px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: linear-gradient(135deg, #2b96ff 0%, #2a6bff 100%);
+      box-shadow: 0 10px 20px rgba(33, 111, 214, 0.18);
+    }
+
+    .screen-panel {
+      display: none;
+    }
+
+    .screen-panel.active {
+      display: block;
+    }
+
+    .insight-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+    }
+
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .check-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(137, 183, 226, 0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,249,255,0.92) 100%);
+      color: #1c4771;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .check-pill input {
+      width: 18px;
+      height: 18px;
+      min-height: 18px;
+      margin: 0;
+    }
+
+    .insight-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .insight-item {
+      border-radius: 16px;
+      border: 1px solid rgba(137, 183, 226, 0.18);
+      padding: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,249,255,0.92) 100%);
+      color: #244d77;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .insight-item strong {
+      color: #17324d;
+    }
+
+    .memory-box {
+      min-height: 170px;
+      font-size: 14px;
+    }
+
+    .asset-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .asset-qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .asset-qr-card {
+      border: 1px solid rgba(137, 183, 226, 0.18);
+      border-radius: 18px;
+      padding: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,249,255,0.92) 100%);
+      text-align: center;
+    }
+
+    .asset-qr-card canvas {
+      width: 140px;
+      height: 140px;
+      max-width: 100%;
+      display: block;
+      margin: 0 auto 8px;
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+      border: 1px solid rgba(137, 183, 226, 0.18);
+    }
+
+    .metric-band {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .metric-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.86);
+      border: 1px solid rgba(133, 184, 232, 0.22);
+      color: #1e4f81;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     .hidden {
       display: none !important;
     }
@@ -893,7 +1044,15 @@
       </div>
     </div>
 
-    <div class="grid">
+    <div class="app-tabs" id="appTabs">
+      <button class="tab-btn active" type="button" data-screen="pools">Pool testing</button>
+      <button class="tab-btn" type="button" data-screen="closedLoops">Closed loops</button>
+      <button class="tab-btn" type="button" data-screen="insights">Insights & assets</button>
+      <button class="tab-btn" type="button" data-screen="admin">QR & setup</button>
+    </div>
+
+    <div id="screenPools" class="screen-panel active">
+      <div class="grid">
       <!-- Pool selection moved above Quick capture -->
       <section class="card span-4">
         <h2>Pool selection</h2>
@@ -1149,7 +1308,7 @@
         <div id="stockContent"></div>
       </section>
 
-      <section class="card span-12" id="qrCodesCard">
+      <section class="card span-12 hidden" id="qrCodesCard">
         <h2>QR codes</h2>
         <div class="mode-note">Each QR opens this app straight to a pool, plus one QR for Raiders Ice Baths - All 3.</div>
         <div id="qrCodesWrap" class="qr-grid"></div>
@@ -1160,9 +1319,227 @@
         <div class="actions" style="margin-bottom: 12px;">
           <button class="button" id="generateReportBtn" type="button">Generate report</button>
           <button class="button secondary" id="saveReportBtn" type="button">Generate and save PDF</button>
+          <button class="button ghost" id="saveVisitSnapshotBtn" type="button">Save visit snapshot</button>
         </div>
         <div class="report-output" id="reportOutput">Tap Generate report to build the service report.</div>
         <div class="footer-note">PDF export is set to landscape.</div>
+      </section>
+    </div>
+  </div>
+
+  <div id="screenClosedLoops" class="screen-panel">
+    <div class="grid">
+      <section class="card span-12">
+        <h2>Closed loop quick capture</h2>
+        <div class="field-grid quick-capture-grid" style="margin-bottom: 12px;">
+          <div class="field">
+            <label for="closedSite">Site</label>
+            <input id="closedSite" type="text" placeholder="Enter site" />
+          </div>
+          <div class="field">
+            <label for="closedSystemName">System / plant</label>
+            <input id="closedSystemName" type="text" placeholder="AHU, chiller plant, boiler loop" />
+          </div>
+          <div class="field">
+            <label for="closedTechnician">Technician</label>
+            <select id="closedTechnician">
+              <option value="">Select technician</option>
+              <option value="Jarrod Strange">Jarrod Strange</option>
+              <option value="Mark Seebohm">Mark Seebohm</option>
+              <option value="Daniel Searle">Daniel Searle</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="closedDate">Date</label>
+            <input id="closedDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="closedTime">Test time</label>
+            <input id="closedTime" type="time" />
+          </div>
+          <div class="field">
+            <label for="closedVisitInterval">Next service in (days)</label>
+            <input id="closedVisitInterval" type="number" min="1" step="1" value="30" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="closedNotes">Closed loop notes</label>
+          <textarea id="closedNotes" placeholder="Optional notes about dosing, bleed-off, filter changes, contamination, corrosion risk or actions taken"></textarea>
+        </div>
+      </section>
+
+      <section class="card span-6">
+        <h2>HHW</h2>
+        <div class="field-grid">
+          <div class="field"><label for="hhwTds">TDS</label><input id="hhwTds" type="number" step="1" inputmode="decimal" placeholder="ppm" /></div>
+          <div class="field"><label for="hhwTdsMin">TDS min</label><input id="hhwTdsMin" type="number" step="1" inputmode="decimal" value="500" /></div>
+          <div class="field"><label for="hhwTdsMax">TDS max</label><input id="hhwTdsMax" type="number" step="1" inputmode="decimal" value="1500" /></div>
+          <div class="field"><label for="hhwPh">pH</label><input id="hhwPh" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 8.5" /></div>
+          <div class="field"><label for="hhwPhMin">pH min</label><input id="hhwPhMin" type="number" step="0.01" inputmode="decimal" value="8.0" /></div>
+          <div class="field"><label for="hhwPhMax">pH max</label><input id="hhwPhMax" type="number" step="0.01" inputmode="decimal" value="10.0" /></div>
+          <div class="field"><label for="hhwInhibitor">Inhibitor</label><input id="hhwInhibitor" type="number" step="0.01" inputmode="decimal" placeholder="ppm or %" /></div>
+          <div class="field"><label for="hhwInhibitorMin">Inhibitor min</label><input id="hhwInhibitorMin" type="number" step="0.01" inputmode="decimal" value="600" /></div>
+          <div class="field"><label for="hhwInhibitorMax">Inhibitor max</label><input id="hhwInhibitorMax" type="number" step="0.01" inputmode="decimal" value="1200" /></div>
+        </div>
+      </section>
+
+      <section class="card span-6">
+        <h2>CHW</h2>
+        <div class="field-grid">
+          <div class="field"><label for="chwTds">TDS</label><input id="chwTds" type="number" step="1" inputmode="decimal" placeholder="ppm" /></div>
+          <div class="field"><label for="chwTdsMin">TDS min</label><input id="chwTdsMin" type="number" step="1" inputmode="decimal" value="250" /></div>
+          <div class="field"><label for="chwTdsMax">TDS max</label><input id="chwTdsMax" type="number" step="1" inputmode="decimal" value="1200" /></div>
+          <div class="field"><label for="chwPh">pH</label><input id="chwPh" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 8.5" /></div>
+          <div class="field"><label for="chwPhMin">pH min</label><input id="chwPhMin" type="number" step="0.01" inputmode="decimal" value="7.5" /></div>
+          <div class="field"><label for="chwPhMax">pH max</label><input id="chwPhMax" type="number" step="0.01" inputmode="decimal" value="9.5" /></div>
+          <div class="field"><label for="chwInhibitor">Inhibitor</label><input id="chwInhibitor" type="number" step="0.01" inputmode="decimal" placeholder="ppm or %" /></div>
+          <div class="field"><label for="chwInhibitorMin">Inhibitor min</label><input id="chwInhibitorMin" type="number" step="0.01" inputmode="decimal" value="600" /></div>
+          <div class="field"><label for="chwInhibitorMax">Inhibitor max</label><input id="chwInhibitorMax" type="number" step="0.01" inputmode="decimal" value="1200" /></div>
+        </div>
+      </section>
+
+      <section class="card span-12">
+        <h2>Closed loop status</h2>
+        <div class="kpi-wrap">
+          <div class="kpi"><div class="name">Systems</div><div class="value" id="closedLoopKpiSystems">2</div><div class="unit">HHW and CHW</div></div>
+          <div class="kpi"><div class="name">Parameters flagged</div><div class="value" id="closedLoopKpiFlags">0</div><div class="unit">outside range</div></div>
+          <div class="kpi"><div class="name">Forecast</div><div class="value" id="closedLoopKpiForecast">Stable</div><div class="unit">to next visit</div></div>
+          <div class="kpi"><div class="name">Report state</div><div class="value" id="closedLoopKpiReport">Draft</div><div class="unit">updates live</div></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Loop</th><th>Parameter</th><th>Current</th><th>Normal range</th><th>Status</th><th>Recommended action</th></tr>
+            </thead>
+            <tbody id="closedLoopTableBody"></tbody>
+          </table>
+        </div>
+        <div class="hint" style="margin-top: 12px;">Use this for heating and cooling closed loops. Ranges are editable per site so the report matches the plant you are testing.</div>
+      </section>
+
+      <section class="card span-12">
+        <h2>Closed loop report</h2>
+        <div class="actions" style="margin-bottom: 12px;">
+          <button class="button" id="generateClosedReportBtn" type="button">Generate report</button>
+          <button class="button secondary" id="saveClosedReportBtn" type="button">Generate and save PDF</button>
+          <button class="button ghost" id="saveClosedSnapshotBtn" type="button">Save closed loop snapshot</button>
+        </div>
+        <div class="report-output" id="closedReportOutput">Tap Generate report to build the closed loop report.</div>
+        <div class="footer-note">PDF export is set to landscape.</div>
+      </section>
+    </div>
+  </div>
+
+  <div id="screenInsights" class="screen-panel">
+    <div class="grid">
+      <section class="card span-12">
+        <h2>Smart insights</h2>
+        <div class="field-grid" style="margin-bottom: 12px;">
+          <div class="field">
+            <label for="visitFrequencyDays">Next pool service in (days)</label>
+            <input id="visitFrequencyDays" type="number" min="1" step="1" value="7" />
+            <small>Used by forecast mode.</small>
+          </div>
+          <div class="field">
+            <label for="siteMemoryText">Site memory</label>
+            <textarea id="siteMemoryText" class="memory-box" placeholder="Store the pool's personality here — common faults, usual pH drift, owner habits, sensor quirks, preferred doses, Enviroswim notes"></textarea>
+          </div>
+        </div>
+        <div class="actions" style="margin-bottom: 12px;">
+          <button class="button secondary" id="saveSiteMemoryBtn" type="button">Save site memory</button>
+          <button class="button ghost" id="saveInsightSnapshotBtn" type="button">Save snapshot from insights</button>
+        </div>
+        <div class="insight-grid">
+          <div class="subcard">
+            <h3>Anomaly watch</h3>
+            <div id="anomalySummary" class="insight-list"></div>
+          </div>
+          <div class="subcard">
+            <h3>Forecast mode</h3>
+            <div id="forecastSummary" class="insight-list"></div>
+          </div>
+          <div class="subcard">
+            <h3>Chemical usage intelligence</h3>
+            <div id="usageSummary" class="insight-list"></div>
+          </div>
+          <div class="subcard">
+            <h3>Blame shield / service context</h3>
+            <div class="check-grid">
+              <label class="check-pill"><input id="ctxOwnerChemicals" type="checkbox" /> Owner added chemicals</label>
+              <label class="check-pill"><input id="ctxNoCirculation" type="checkbox" /> No circulation on arrival</label>
+              <label class="check-pill"><input id="ctxHeavySun" type="checkbox" /> Heavy sun / heat load</label>
+              <label class="check-pill"><input id="ctxHighBatherLoad" type="checkbox" /> High bather load</label>
+              <label class="check-pill"><input id="ctxRainDilution" type="checkbox" /> Rain / dilution event</label>
+              <label class="check-pill"><input id="ctxTopUpOff" type="checkbox" /> Top-up / balance tank issue</label>
+            </div>
+            <div class="field" style="margin-top: 10px;">
+              <label for="contextExtraNote">Extra context note</label>
+              <input id="contextExtraNote" type="text" placeholder="Optional note to carry into the report and history" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card span-12">
+        <h2>Visit history</h2>
+        <div class="metric-band" id="historyMetricBand"></div>
+        <div class="log-table-wrap">
+          <table class="stock-table">
+            <thead>
+              <tr><th>Date / time</th><th>Pool</th><th>pH</th><th>FC</th><th>Alk</th><th>Acid</th><th>Chlorine</th><th>Context / notes</th></tr>
+            </thead>
+            <tbody id="historyTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card span-12">
+        <h2>Equipment register</h2>
+        <div class="asset-form-grid">
+          <div class="field"><label for="assetType">Asset type</label><input id="assetType" type="text" placeholder="Pump, filter, heater, chlorinator" /></div>
+          <div class="field"><label for="assetId">Asset ID / sticker code</label><input id="assetId" type="text" placeholder="e.g. JC-P1" /></div>
+          <div class="field"><label for="assetLocation">Location</label><input id="assetLocation" type="text" placeholder="Plant room, roof, balance tank" /></div>
+          <div class="field"><label for="assetStatus">Status</label><select id="assetStatus"><option value="">Select</option><option>OK</option><option>Monitor</option><option>Service due</option><option>Fault</option></select></div>
+          <div class="field"><label for="assetNote">Asset note</label><input id="assetNote" type="text" placeholder="Part number, fault, next step" /></div>
+        </div>
+        <div class="actions" style="margin-bottom: 12px;">
+          <button class="button secondary" id="saveAssetBtn" type="button">Save asset</button>
+        </div>
+        <div class="log-table-wrap">
+          <table class="stock-table">
+            <thead>
+              <tr><th>Asset type</th><th>ID</th><th>Location</th><th>Status</th><th>Last note</th></tr>
+            </thead>
+            <tbody id="assetTableBody"></tbody>
+          </table>
+        </div>
+        <div id="assetQrWrap" class="asset-qr-grid"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="screenAdmin" class="screen-panel">
+    <div class="grid">
+      <section class="card span-12">
+        <h2>QR codes and setup</h2>
+        <div class="field-grid" style="margin-bottom: 12px;">
+          <div class="field">
+            <label for="appBaseUrl">App URL used for QR codes</label>
+            <input id="appBaseUrl" type="text" readonly />
+            <small>Print these from the admin screen only so the main testing screen stays clean.</small>
+          </div>
+        </div>
+        <div id="adminQrCodesWrap" class="qr-grid"></div>
+      </section>
+
+      <section class="card span-12">
+        <h2>Local data tools</h2>
+        <div class="actions" style="margin-bottom: 12px;">
+          <button class="button secondary" id="exportDataBtn" type="button">Export local data</button>
+          <button class="button ghost" id="clearHistoryBtn" type="button">Clear visit history</button>
+          <button class="button ghost" id="clearAssetsBtn" type="button">Clear equipment register</button>
+        </div>
+        <div class="hint">History, site memory, asset notes and stock logs are stored in this browser right now. If you want live shared updates across staff phones, the next step is connecting the app to a shared backend such as Google Sheets, Firebase or Supabase.</div>
       </section>
     </div>
   </div>
@@ -1178,6 +1555,12 @@
     const STOCK_STORAGE_KEY = 'mbs-pool-stock-v1';
     const DOSE_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium', 'stabiliser', 'salt'];
     const QR_SIZE = 180;
+    const HISTORY_STORAGE_KEY = 'mbs-pool-history-v1';
+    const SITE_MEMORY_STORAGE_KEY = 'mbs-site-memory-v1';
+    const ASSET_STORAGE_KEY = 'mbs-asset-registry-v1';
+    const CLOSED_LOOP_HISTORY_KEY = 'mbs-closed-loop-history-v1';
+    const ACTIVE_SCREEN_STORAGE_KEY = 'mbs-active-screen-v1';
+    let activeScreen = 'pools';
 
     // Updated list of pools including Raiders Ice Baths 2 & 3, Kamy Saeedi and Nathan's Pool.
     // James Court Pool and Spa have their CYA targets set to 0.  Each of the ice baths now
@@ -1309,6 +1692,20 @@
       return document.getElementById(id);
     }
 
+    function loadJson(key, fallback) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+        return parsed == null ? fallback : parsed;
+      } catch (error) {
+        console.error(`Failed loading ${key}`, error);
+        return fallback;
+      }
+    }
+
+    function saveJson(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
     function n(value) {
       const parsed = parseFloat(value);
       return Number.isFinite(parsed) ? parsed : null;
@@ -1348,12 +1745,10 @@
 
     function setDefaultDateTime() {
       const now = new Date();
-      if (!inputs.reportDate.value) {
-        inputs.reportDate.value = now.toISOString().slice(0, 10);
-      }
-      if (!inputs.testTime.value) {
-        inputs.testTime.value = now.toTimeString().slice(0, 5);
-      }
+      if (inputs.reportDate && !inputs.reportDate.value) inputs.reportDate.value = now.toISOString().slice(0, 10);
+      if (inputs.testTime && !inputs.testTime.value) inputs.testTime.value = now.toTimeString().slice(0, 5);
+      if (inputs.closedDate && !inputs.closedDate.value) inputs.closedDate.value = now.toISOString().slice(0, 10);
+      if (inputs.closedTime && !inputs.closedTime.value) inputs.closedTime.value = now.toTimeString().slice(0, 5);
     }
 
     function populatePoolSelect() {
@@ -1400,6 +1795,8 @@
 
       updateActiveVolume();
       updateModeVisibility();
+      renderSiteMemory();
+      renderInsightsSection();
     }
 
     function updateActiveVolume() {
@@ -1496,6 +1893,562 @@
           <div class="mini-pill"><strong>Reading</strong>pH ${rec.ph == null ? '-' : formatNumber(rec.ph, 2)} | FC ${rec.fc == null ? '-' : formatNumber(rec.fc, 2)} | Alk ${rec.alk == null ? '-' : formatNumber(rec.alk, 0)}</div>
         `;
       });
+    }
+
+    function getContextTags() {
+      const tags = [];
+      const mapping = [
+        ['ctxOwnerChemicals', 'Owner added chemicals'],
+        ['ctxNoCirculation', 'No circulation on arrival'],
+        ['ctxHeavySun', 'Heavy sun / heat load'],
+        ['ctxHighBatherLoad', 'High bather load'],
+        ['ctxRainDilution', 'Rain / dilution event'],
+        ['ctxTopUpOff', 'Top-up / balance tank issue']
+      ];
+      mapping.forEach(([id, label]) => {
+        if (inputs[id] && inputs[id].checked) tags.push(label);
+      });
+      if (inputs.contextExtraNote && inputs.contextExtraNote.value.trim()) tags.push(inputs.contextExtraNote.value.trim());
+      return tags;
+    }
+
+    function getSiteMemoryState() {
+      return loadJson(SITE_MEMORY_STORAGE_KEY, {});
+    }
+
+    function saveSiteMemoryState(state) {
+      saveJson(SITE_MEMORY_STORAGE_KEY, state);
+    }
+
+    function renderSiteMemory() {
+      if (!inputs.siteMemoryText) return;
+      const pool = getSelectedPool();
+      const memory = getSiteMemoryState();
+      inputs.siteMemoryText.value = memory[pool.key] || '';
+    }
+
+    function saveCurrentSiteMemory() {
+      if (!inputs.siteMemoryText) return;
+      const pool = getSelectedPool();
+      const memory = getSiteMemoryState();
+      memory[pool.key] = inputs.siteMemoryText.value.trim();
+      saveSiteMemoryState(memory);
+      renderInsightsSection();
+    }
+
+    function getHistoryState() {
+      return loadJson(HISTORY_STORAGE_KEY, []);
+    }
+
+    function saveHistoryState(state) {
+      saveJson(HISTORY_STORAGE_KEY, state);
+    }
+
+    function getClosedLoopHistoryState() {
+      return loadJson(CLOSED_LOOP_HISTORY_KEY, []);
+    }
+
+    function saveClosedLoopHistoryState(state) {
+      saveJson(CLOSED_LOOP_HISTORY_KEY, state);
+    }
+
+    function getAssetState() {
+      return loadJson(ASSET_STORAGE_KEY, {});
+    }
+
+    function saveAssetState(state) {
+      saveJson(ASSET_STORAGE_KEY, state);
+    }
+
+    function getPoolHistory(poolKey) {
+      return getHistoryState().filter(entry => entry.poolKey === poolKey).sort((a, b) => new Date(a.ts) - new Date(b.ts));
+    }
+
+    function buildPoolVisitSnapshot() {
+      const pool = getSelectedPool();
+      const { doses } = buildRecommendationRows();
+      const now = new Date();
+      return {
+        ts: now.toISOString(),
+        poolKey: pool.key,
+        poolName: pool.poolName,
+        site: inputs.reportSite.value || pool.site || '',
+        date: inputs.reportDate.value || now.toISOString().slice(0, 10),
+        time: inputs.testTime.value || now.toTimeString().slice(0, 5),
+        clarity: inputs.waterClarity.value || '',
+        ph: n(inputs.ph.value),
+        fc: n(inputs.freeChlorine.value),
+        alk: n(inputs.alkalinity.value),
+        calcium: n(inputs.calciumHardness.value),
+        cya: n(inputs.cyanuricAcid.value),
+        salt: n(inputs.salt.value),
+        acid: doses.acid || 0,
+        chlorine: doses.chlorine || 0,
+        bicarb: doses.bicarb || 0,
+        calciumDose: doses.calcium || 0,
+        stabiliser: doses.stabiliser || 0,
+        saltDose: doses.salt || 0,
+        notes: (inputs.serviceNotes.value || '').trim(),
+        context: getContextTags()
+      };
+    }
+
+    function savePoolVisitSnapshot() {
+      if (isRaidersGroupMode()) {
+        alert('Use the grouped report for the Raiders ice baths. Switch to a single pool if you want a single-pool history snapshot.');
+        return;
+      }
+      const history = getHistoryState();
+      history.push(buildPoolVisitSnapshot());
+      while (history.length > 300) history.shift();
+      saveHistoryState(history);
+      renderInsightsSection();
+    }
+
+    function getRangeAlertMessages(current, average, label, threshold, decimals) {
+      if (current == null || average == null) return null;
+      const delta = round(current - average, decimals);
+      if (Math.abs(delta) < threshold) return null;
+      const dir = delta > 0 ? 'higher' : 'lower';
+      return `${label} is ${formatNumber(Math.abs(delta), decimals)} ${dir} than this site's recent average.`;
+    }
+
+    function buildAnomalySummary() {
+      const pool = getSelectedPool();
+      const history = getPoolHistory(pool.key);
+      if (history.length < 3) {
+        return ['Build at least 3 visit snapshots for this pool to activate anomaly watch.'];
+      }
+      const recent = history.slice(-5);
+      const avg = key => {
+        const vals = recent.map(item => item[key]).filter(v => Number.isFinite(v));
+        if (!vals.length) return null;
+        return vals.reduce((a, b) => a + b, 0) / vals.length;
+      };
+      const messages = [
+        getRangeAlertMessages(n(inputs.ph.value), avg('ph'), 'pH', 0.25, 2),
+        getRangeAlertMessages(n(inputs.freeChlorine.value), avg('fc'), 'Free chlorine', 0.8, 2),
+        getRangeAlertMessages(n(inputs.alkalinity.value), avg('alk'), 'Alkalinity', 20, 0),
+        getRangeAlertMessages(n(inputs.salt.value), avg('salt'), 'Salt', 250, 0)
+      ].filter(Boolean);
+      if (!messages.length) messages.push('No unusual drift detected against the recent visit history for this pool.');
+      return messages;
+    }
+
+    function buildForecastSummary() {
+      const days = Math.max(1, n(inputs.visitFrequencyDays && inputs.visitFrequencyDays.value) || 7);
+      const ph = n(inputs.ph.value);
+      const fc = n(inputs.freeChlorine.value);
+      const targetPh = n(inputs.targetPh.value);
+      const targetFc = n(inputs.targetFreeChlorine.value);
+      const messages = [];
+      let risk = 'Stable';
+
+      if (fc == null || targetFc == null) {
+        messages.push('Add a free chlorine result to forecast chlorine risk to the next visit.');
+      } else if (fc < targetFc || (days > 7 && fc < targetFc + 0.5)) {
+        risk = 'Watch';
+        messages.push(`Free chlorine could fall short before the next service in ${days} days.`);
+      } else {
+        messages.push(`Free chlorine looks serviceable for roughly ${days} days at current demand.`);
+      }
+
+      if (ph == null || targetPh == null) {
+        messages.push('Add a pH result to forecast pH drift.');
+      } else if (Math.abs(ph - targetPh) > 0.3 || ph >= 7.7) {
+        risk = 'Action';
+        messages.push('pH is already drifting away from the normal sweet spot and may need attention before the next visit.');
+      } else {
+        messages.push('pH trend looks safe to monitor to the next visit.');
+      }
+
+      return { risk, messages };
+    }
+
+    function buildUsageSummary() {
+      const pool = getSelectedPool();
+      const history = getPoolHistory(pool.key);
+      if (history.length < 4) {
+        return ['Save more snapshots to unlock usage intelligence for this pool.'];
+      }
+      const recent = history.slice(-3);
+      const prior = history.slice(-6, -3);
+      const compareDose = (key, label, decimals = 0) => {
+        if (!prior.length) return null;
+        const r = recent.reduce((sum, item) => sum + (item[key] || 0), 0) / recent.length;
+        const p = prior.reduce((sum, item) => sum + (item[key] || 0), 0) / prior.length;
+        if (!Number.isFinite(r) || !Number.isFinite(p) || p === 0) return null;
+        const change = ((r - p) / p) * 100;
+        if (Math.abs(change) < 20) return `${label} use is tracking close to normal for this pool.`;
+        const dir = change > 0 ? 'up' : 'down';
+        return `${label} use is ${formatNumber(Math.abs(change), 0)}% ${dir} against the prior service window.`;
+      };
+      return [
+        compareDose('acid', 'Acid'),
+        compareDose('chlorine', 'Chlorine'),
+        compareDose('bicarb', 'Bicarb', 2)
+      ].filter(Boolean);
+    }
+
+    function renderInsightList(targetId, messages) {
+      const wrap = qs(targetId);
+      if (!wrap) return;
+      wrap.innerHTML = messages.map(message => `<div class="insight-item">${escapeHtml(message)}</div>`).join('');
+    }
+
+    async function renderAssetQrCards(poolKey) {
+      const wrap = qs('assetQrWrap');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      const state = getAssetState();
+      const assets = state[poolKey] || [];
+      const base = getBaseAppUrl();
+      for (const asset of assets.slice(-8)) {
+        const card = document.createElement('div');
+        card.className = 'asset-qr-card';
+        card.innerHTML = `<div style="font-weight:800; color:#1c4771; margin-bottom:6px;">${escapeHtml(asset.type || 'Asset')}</div><div class="inline-note">${escapeHtml(asset.id || '')}</div><div id="assetQr_${escapeHtml(asset.id || '').replace(/[^a-zA-Z0-9_-]/g, '')}"></div><div class="inline-note">${escapeHtml(asset.location || '')}</div>`;
+        wrap.appendChild(card);
+        const target = card.querySelector('div[id^="assetQr_"]');
+        if (target && window.QRCode && asset.id) {
+          const canvas = document.createElement('canvas');
+          try {
+            await QRCode.toCanvas(canvas, `${base}?asset=${encodeURIComponent(asset.id)}&pool=${encodeURIComponent(poolKey)}`, { width: 140, margin: 1 });
+            target.appendChild(canvas);
+          } catch (error) {
+            target.textContent = 'QR failed';
+          }
+        }
+      }
+    }
+
+    function renderAssetSection() {
+      const tbody = qs('assetTableBody');
+      if (!tbody) return;
+      const pool = getSelectedPool();
+      const state = getAssetState();
+      const assets = state[pool.key] || [];
+      tbody.innerHTML = assets.length ? assets.map(asset => `
+        <tr>
+          <td>${escapeHtml(asset.type || '')}</td>
+          <td>${escapeHtml(asset.id || '')}</td>
+          <td>${escapeHtml(asset.location || '')}</td>
+          <td>${escapeHtml(asset.status || '')}</td>
+          <td>${escapeHtml(asset.note || '')}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="5">No assets saved yet for this pool.</td></tr>';
+      renderAssetQrCards(pool.key);
+    }
+
+    function saveAsset() {
+      const pool = getSelectedPool();
+      const payload = {
+        type: inputs.assetType.value.trim(),
+        id: inputs.assetId.value.trim(),
+        location: inputs.assetLocation.value.trim(),
+        status: inputs.assetStatus.value,
+        note: inputs.assetNote.value.trim(),
+        ts: new Date().toISOString()
+      };
+      if (!payload.type || !payload.id) {
+        alert('Add at least an asset type and asset ID.');
+        return;
+      }
+      const state = getAssetState();
+      state[pool.key] = state[pool.key] || [];
+      const existingIndex = state[pool.key].findIndex(item => item.id === payload.id);
+      if (existingIndex >= 0) state[pool.key][existingIndex] = payload;
+      else state[pool.key].push(payload);
+      saveAssetState(state);
+      ['assetType','assetId','assetLocation','assetStatus','assetNote'].forEach(id => { if (inputs[id]) inputs[id].value = ''; });
+      renderAssetSection();
+    }
+
+    function renderHistorySection() {
+      const metricBand = qs('historyMetricBand');
+      const tbody = qs('historyTableBody');
+      if (!metricBand || !tbody) return;
+      const pool = getSelectedPool();
+      const history = getPoolHistory(pool.key);
+      metricBand.innerHTML = [
+        `<div class="metric-chip">Snapshots saved: ${history.length}</div>`,
+        `<div class="metric-chip">Current pool: ${escapeHtml(pool.poolName)}</div>`,
+        `<div class="metric-chip">Site memory: ${(getSiteMemoryState()[pool.key] || '').length ? 'Saved' : 'Blank'}</div>`
+      ].join('');
+      const rows = history.slice(-12).reverse();
+      tbody.innerHTML = rows.length ? rows.map(item => `
+        <tr>
+          <td>${escapeHtml(formatDateDisplay(item.date))} ${escapeHtml(item.time || '')}</td>
+          <td>${escapeHtml(item.poolName || '')}</td>
+          <td>${item.ph == null ? '-' : formatNumber(item.ph, 2)}</td>
+          <td>${item.fc == null ? '-' : formatNumber(item.fc, 2)}</td>
+          <td>${item.alk == null ? '-' : formatNumber(item.alk, 0)}</td>
+          <td>${formatDose(item.acid || 0, 'mL', 0)}</td>
+          <td>${formatDose(item.chlorine || 0, 'mL', 0)}</td>
+          <td>${escapeHtml((item.context || []).join('; ') || item.notes || '')}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="8">No snapshots saved yet for this pool.</td></tr>';
+    }
+
+    function renderInsightsSection() {
+      if (!qs('anomalySummary')) return;
+      renderSiteMemory();
+      renderInsightList('anomalySummary', buildAnomalySummary());
+      const forecast = buildForecastSummary();
+      renderInsightList('forecastSummary', forecast.messages);
+      renderInsightList('usageSummary', buildUsageSummary());
+      renderHistorySection();
+      renderAssetSection();
+    }
+
+    function closedLoopStatus(current, min, max) {
+      if (current == null || min == null || max == null) return { label: 'Missing', className: 'status-pill', action: 'Enter the current reading and the normal range.' };
+      if (current < min) return { label: 'Low', className: 'status-pill status-warn' };
+      if (current > max) return { label: 'High', className: 'status-pill status-bad' };
+      return { label: 'In range', className: 'status-pill status-good' };
+    }
+
+    function buildClosedLoopRows() {
+      const fields = [
+        { loop: 'HHW', parameter: 'TDS', current: n(inputs.hhwTds.value), min: n(inputs.hhwTdsMin.value), max: n(inputs.hhwTdsMax.value), decimals: 0, unit: 'ppm' },
+        { loop: 'HHW', parameter: 'pH', current: n(inputs.hhwPh.value), min: n(inputs.hhwPhMin.value), max: n(inputs.hhwPhMax.value), decimals: 2, unit: '' },
+        { loop: 'HHW', parameter: 'Inhibitor', current: n(inputs.hhwInhibitor.value), min: n(inputs.hhwInhibitorMin.value), max: n(inputs.hhwInhibitorMax.value), decimals: 2, unit: '' },
+        { loop: 'CHW', parameter: 'TDS', current: n(inputs.chwTds.value), min: n(inputs.chwTdsMin.value), max: n(inputs.chwTdsMax.value), decimals: 0, unit: 'ppm' },
+        { loop: 'CHW', parameter: 'pH', current: n(inputs.chwPh.value), min: n(inputs.chwPhMin.value), max: n(inputs.chwPhMax.value), decimals: 2, unit: '' },
+        { loop: 'CHW', parameter: 'Inhibitor', current: n(inputs.chwInhibitor.value), min: n(inputs.chwInhibitorMin.value), max: n(inputs.chwInhibitorMax.value), decimals: 2, unit: '' }
+      ];
+      return fields.map(item => {
+        const status = closedLoopStatus(item.current, item.min, item.max);
+        let action = status.action || 'Monitor to the next visit.';
+        if (item.current != null && item.min != null && item.max != null) {
+          if (item.parameter === 'TDS' && item.current > item.max) action = 'High TDS - investigate contamination, bleed-off or dilution requirements and retest.';
+          else if (item.parameter === 'TDS' && item.current < item.min) action = 'Low TDS - confirm make-up water condition and confirm treatment concentration.';
+          else if (item.parameter === 'pH' && item.current > item.max) action = 'High pH - adjust downward as per the site treatment programme and retest.';
+          else if (item.parameter === 'pH' && item.current < item.min) action = 'Low pH - investigate corrosion risk and correct as per the site treatment programme.';
+          else if (item.parameter === 'Inhibitor' && item.current < item.min) action = 'Low inhibitor - top up inhibitor as per the treatment programme and verify system protection.';
+          else if (item.parameter === 'Inhibitor' && item.current > item.max) action = 'High inhibitor - confirm dosing concentration and investigate overfeed.';
+          else action = 'Within range - continue normal monitoring.';
+        }
+        return { ...item, status, action };
+      });
+    }
+
+    function renderClosedLoopTable() {
+      const tbody = qs('closedLoopTableBody');
+      if (!tbody) return;
+      const rows = buildClosedLoopRows();
+      tbody.innerHTML = rows.map(row => `
+        <tr>
+          <td><strong>${escapeHtml(row.loop)}</strong></td>
+          <td>${escapeHtml(row.parameter)}</td>
+          <td>${row.current == null ? '-' : `${formatNumber(row.current, row.decimals)}${row.unit ? ` ${row.unit}` : ''}`}</td>
+          <td>${row.min == null || row.max == null ? '-' : `${formatNumber(row.min, row.decimals)} - ${formatNumber(row.max, row.decimals)}${row.unit ? ` ${row.unit}` : ''}`}</td>
+          <td><span class="${row.status.className}">${row.status.label}</span></td>
+          <td>${escapeHtml(row.action)}</td>
+        </tr>
+      `).join('');
+      const flagged = rows.filter(row => row.status.label === 'Low' || row.status.label === 'High').length;
+      const forecast = flagged >= 3 ? 'Action' : flagged >= 1 ? 'Watch' : 'Stable';
+      qs('closedLoopKpiFlags').textContent = String(flagged);
+      qs('closedLoopKpiForecast').textContent = forecast;
+      qs('closedLoopKpiReport').textContent = 'Live';
+    }
+
+    function buildClosedLoopReportModel() {
+      const rows = buildClosedLoopRows();
+      return {
+        title: 'Closed Loop Water Quality Testing Report',
+        companyName: 'MBS Facility Maintenance',
+        companyLines: ['63 Tennant Street', 'Fyshwick ACT 2609', '(02) 6162 0216', 'info@mbsfm.com.au'],
+        site: inputs.closedSite.value || '-',
+        systemName: inputs.closedSystemName.value || '-',
+        technician: inputs.closedTechnician.value || '-',
+        date: formatDateDisplay(inputs.closedDate.value || ''),
+        testTime: formatTimeDisplay(inputs.closedTime.value || ''),
+        rows,
+        notes: (inputs.closedNotes.value || '').trim() || 'No additional closed loop notes entered.'
+      };
+    }
+
+    function buildClosedLoopReportHtml() {
+      const model = buildClosedLoopReportModel();
+      return `
+        <div class="report-sheet">
+          <div class="report-sheet-header">
+            <div class="report-brand-card">
+              <div class="report-brand-top">
+                <img class="report-logo" src="${REPORT_LOGO_DATA}" alt="MBS FM logo" />
+                <div class="report-company">
+                  <strong>${escapeHtml(model.companyName)}</strong>
+                  ${model.companyLines.map(line => escapeHtml(line)).join('<br>')}
+                </div>
+              </div>
+              <div class="report-brand-strip">
+                <div class="report-title">${escapeHtml(model.title)}</div>
+              </div>
+            </div>
+            <div class="report-meta-card">
+              <div class="report-meta-head">Test details</div>
+              <div class="report-meta-body">
+                <div class="report-meta-grid">
+                  <div class="report-meta-item"><span class="label">Site</span><span class="value">${escapeHtml(model.site)}</span></div>
+                  <div class="report-meta-item"><span class="label">Technician</span><span class="value">${escapeHtml(model.technician)}</span></div>
+                  <div class="report-meta-item full"><span class="label">System</span><span class="value">${escapeHtml(model.systemName)}</span></div>
+                  <div class="report-meta-item"><span class="label">Date</span><span class="value">${escapeHtml(model.date)}</span></div>
+                  <div class="report-meta-item"><span class="label">Test time</span><span class="value">${escapeHtml(model.testTime)}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="report-section-bar">Closed loop test results</div>
+          <table class="report-table">
+            <thead>
+              <tr><th>Loop</th><th>Parameter</th><th>Current</th><th>Range</th><th>Status</th><th>Recommended action</th></tr>
+            </thead>
+            <tbody>
+              ${model.rows.map(row => `
+                <tr>
+                  <td>${escapeHtml(row.loop)}</td>
+                  <td>${escapeHtml(row.parameter)}</td>
+                  <td>${row.current == null ? '-' : `${formatNumber(row.current, row.decimals)}${row.unit ? ` ${row.unit}` : ''}`}</td>
+                  <td>${row.min == null || row.max == null ? '-' : `${formatNumber(row.min, row.decimals)} - ${formatNumber(row.max, row.decimals)}${row.unit ? ` ${row.unit}` : ''}`}</td>
+                  <td>${escapeHtml(row.status.label)}</td>
+                  <td>${escapeHtml(row.action)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="report-section-block">
+            <div class="report-section-block-title">Technician notes</div>
+            <div class="report-paragraph">${escapeHtml(model.notes)}</div>
+          </div>
+          <div class="report-footer">Generated from the calculator   Page 1 of 1</div>
+        </div>
+      `;
+    }
+
+    function renderClosedLoopReport() {
+      const output = qs('closedReportOutput');
+      if (!output) return;
+      output.innerHTML = buildClosedLoopReportHtml();
+      qs('closedLoopKpiReport').textContent = 'Ready';
+    }
+
+    async function saveClosedLoopPdfReport() {
+      renderClosedLoopReport();
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert('PDF library did not load. Please refresh and try again.');
+        return;
+      }
+      const model = buildClosedLoopReportModel();
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 10;
+      const blue = [0, 58, 117];
+      const borderBlue = [168, 191, 216];
+
+      const drawSectionBar = (title, yPos) => {
+        doc.setFillColor(...blue);
+        doc.roundedRect(margin, yPos, pageWidth - (margin * 2), 7.5, 2.2, 2.2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(title, margin + 3, yPos + 5);
+        doc.setTextColor(0, 0, 0);
+        return yPos + 8.5;
+      };
+
+      doc.setDrawColor(...borderBlue);
+      doc.roundedRect(6, 6, pageWidth - 12, pageHeight - 12, 4, 4, 'S');
+      doc.setDrawColor(...borderBlue);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, 10, pageWidth - (margin * 2), 36, 3, 3, 'FD');
+      try { doc.addImage(REPORT_LOGO_DATA, 'PNG', margin + 4.5, 13.7, 58, 18.65); } catch (error) {}
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...blue);
+      doc.setFontSize(14);
+      doc.text(model.title, margin + 66, 20);
+      doc.setFontSize(9);
+      doc.text(`Site: ${model.site}`, margin + 66, 28);
+      doc.text(`System: ${model.systemName}`, margin + 66, 34);
+      doc.text(`Technician: ${model.technician}`, pageWidth - 78, 20);
+      doc.text(`Date: ${model.date}`, pageWidth - 78, 28);
+      doc.text(`Time: ${model.testTime}`, pageWidth - 78, 34);
+      doc.setTextColor(0, 0, 0);
+
+      let y = 51;
+      y = drawSectionBar('Closed loop test results', y);
+      const rows = model.rows.map(row => [
+        row.loop,
+        row.parameter,
+        row.current == null ? '-' : `${formatNumber(row.current, row.decimals)}${row.unit ? ` ${row.unit}` : ''}`,
+        row.min == null || row.max == null ? '-' : `${formatNumber(row.min, row.decimals)} - ${formatNumber(row.max, row.decimals)}${row.unit ? ` ${row.unit}` : ''}`,
+        row.status.label,
+        row.action
+      ]);
+      y = drawTable(doc, margin, y, [18, 28, 26, 35, 20, pageWidth - (margin * 2) - 18 - 28 - 26 - 35 - 20], ['Loop', 'Parameter', 'Current', 'Range', 'Status', 'Recommended action'], rows, { fontSize: 8, headerFontSize: 8, striped: true });
+      y += 6;
+      doc.setDrawColor(...borderBlue);
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, y, pageWidth - (margin * 2), 26, 3, 3, 'FD');
+      doc.setFillColor(...blue);
+      doc.roundedRect(margin, y, pageWidth - (margin * 2), 7.5, 3, 3, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8.8);
+      doc.text('Technician notes', margin + 3, y + 5);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.2);
+      doc.text(doc.splitTextToSize(model.notes, pageWidth - (margin * 2) - 6), margin + 3, y + 12);
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(7.5);
+      doc.text('Generated from the calculator   Page 1 of 1', pageWidth - margin, pageHeight - 10, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+
+      const filenameBase = (model.systemName || 'closed-loop-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const filename = `${filenameBase || 'closed-loop-report'}-${inputs.closedDate.value || 'report'}.pdf`;
+      const blob = doc.output('blob');
+      await saveBlob(blob, filename, 'application/pdf');
+    }
+
+    function saveClosedLoopSnapshot() {
+      const history = getClosedLoopHistoryState();
+      history.push({
+        ts: new Date().toISOString(),
+        site: inputs.closedSite.value || '',
+        systemName: inputs.closedSystemName.value || '',
+        date: inputs.closedDate.value || '',
+        time: inputs.closedTime.value || '',
+        rows: buildClosedLoopRows(),
+        notes: (inputs.closedNotes.value || '').trim()
+      });
+      while (history.length > 150) history.shift();
+      saveClosedLoopHistoryState(history);
+    }
+
+    function setActiveScreen(screen) {
+      activeScreen = screen;
+      localStorage.setItem(ACTIVE_SCREEN_STORAGE_KEY, screen);
+      const map = { pools: 'screenPools', closedLoops: 'screenClosedLoops', insights: 'screenInsights', admin: 'screenAdmin' };
+      Object.entries(map).forEach(([key, id]) => {
+        const el = qs(id);
+        if (el) el.classList.toggle('active', key === screen);
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.screen === screen));
+      if (screen === 'closedLoops') renderClosedLoopTable();
+      if (screen === 'insights') renderInsightsSection();
+      if (screen === 'admin') renderQrSection();
+      if (screen === 'pools') { renderCombinedTable(); renderStockSection(); }
+    }
+
+    function initTabs() {
+      const saved = localStorage.getItem(ACTIVE_SCREEN_STORAGE_KEY) || 'pools';
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => setActiveScreen(btn.dataset.screen));
+      });
+      setActiveScreen(saved);
     }
 
     function getEmptyStockState() {
@@ -1649,33 +2602,35 @@
     }
 
     async function renderQrSection() {
-      const wrap = qs('qrCodesWrap');
-      if (!wrap) return;
+      const wraps = [qs('adminQrCodesWrap'), qs('qrCodesWrap')].filter(Boolean);
+      if (!wraps.length) return;
       const baseUrl = getBaseAppUrl();
+      if (qs('appBaseUrl')) qs('appBaseUrl').value = baseUrl;
       const pools = getVisiblePoolsForQr();
-      wrap.innerHTML = pools.map(pool => `
+      const template = pools.map(pool => `
         <div class="qr-card">
           <h3>${escapeHtml(pool.poolName)}</h3>
-          <div id="qr_${pool.key}"></div>
+          <div id="qr_admin_${pool.key}"></div>
           <div class="inline-note">${escapeHtml(pool.key === 'raiders_ice_baths_all' ? 'Grouped report' : 'Single pool report')}</div>
         </div>
       `).join('');
+      wraps.forEach(wrap => { wrap.innerHTML = template; });
       if (!window.QRCode) {
-        Array.from(wrap.querySelectorAll('[id^="qr_"]')).forEach(el => { el.textContent = 'QR generator unavailable'; });
+        document.querySelectorAll('[id^="qr_admin_"]').forEach(el => { el.textContent = 'QR generator unavailable'; });
         return;
       }
       for (const pool of pools) {
-        const target = qs(`qr_${pool.key}`);
-        if (!target) continue;
         const url = `${baseUrl}?pool=${encodeURIComponent(pool.key)}`;
-        try {
-          const canvas = document.createElement('canvas');
-          await QRCode.toCanvas(canvas, url, { width: QR_SIZE, margin: 1 });
-          target.innerHTML = '';
-          target.appendChild(canvas);
-        } catch (error) {
-          target.textContent = 'QR failed';
-        }
+        document.querySelectorAll(`#qr_admin_${pool.key}`).forEach(async target => {
+          try {
+            const canvas = document.createElement('canvas');
+            await QRCode.toCanvas(canvas, url, { width: QR_SIZE, margin: 1 });
+            target.innerHTML = '';
+            target.appendChild(canvas);
+          } catch (error) {
+            target.textContent = 'QR failed';
+          }
+        });
       }
     }
 
@@ -2338,7 +3293,11 @@
         .filter(Boolean);
 
       const serviceNotes = (inputs.serviceNotes.value || '').trim();
+      const contextTags = getContextTags();
+      const siteMemory = getSiteMemoryState()[getSelectedPool().key] || '';
       if (serviceNotes) correctiveActions.push(serviceNotes);
+      if (contextTags.length) correctiveActions.push(`Service context: ${contextTags.join('; ')}.`);
+      if (siteMemory) correctiveActions.push(`Site memory: ${siteMemory}`);
 
       return {
         title: 'Water Quality Testing Report',
@@ -3287,7 +4246,7 @@ async function savePdfReport() {
       const payload = {};
       Object.keys(inputs).forEach(key => {
         if (!inputs[key]) return;
-        payload[key] = inputs[key].value;
+        payload[key] = inputs[key].type === 'checkbox' ? inputs[key].checked : inputs[key].value;
       });
       DOSE_KEYS.forEach(key => {
         const statusField = qs(`doseStatus_${key}`);
@@ -3307,7 +4266,9 @@ async function savePdfReport() {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
         Object.keys(inputs).forEach(key => {
           if (!inputs[key]) return;
-          if (stored[key] != null) inputs[key].value = stored[key];
+          if (stored[key] == null) return;
+          if (inputs[key].type === 'checkbox') inputs[key].checked = Boolean(stored[key]);
+          else inputs[key].value = stored[key];
         });
       } catch (error) {
         console.error('Failed loading state', error);
@@ -3317,7 +4278,9 @@ async function savePdfReport() {
     function resetAll() {
       localStorage.removeItem(STORAGE_KEY);
       Object.keys(inputs).forEach(key => {
-        if (inputs[key].tagName === 'SELECT') {
+        if (inputs[key].type === 'checkbox') {
+          inputs[key].checked = false;
+        } else if (inputs[key].tagName === 'SELECT') {
           inputs[key].selectedIndex = 0;
         } else {
           inputs[key].value = '';
@@ -3333,7 +4296,13 @@ async function savePdfReport() {
       renderCombinedTable();
       renderStockSection();
       renderQrSection();
-      qs('reportOutput').textContent = 'Tap Generate report to build the service report.';
+      renderClosedLoopTable();
+      renderInsightsSection();
+      initTabs();
+      renderInsightsSection();
+      renderClosedLoopTable();
+      if (qs('reportOutput')) qs('reportOutput').textContent = 'Tap Generate report to build the service report.';
+      if (qs('closedReportOutput')) qs('closedReportOutput').textContent = 'Tap Generate report to build the closed loop report.';
     }
 
     function handleInputChange() {
@@ -3344,6 +4313,8 @@ async function savePdfReport() {
       renderCombinedTable();
       renderStockSection();
       renderQrSection();
+      renderInsightsSection();
+      renderClosedLoopTable();
     }
 
     function handlePhotoUpload(event) {
@@ -3366,6 +4337,12 @@ async function savePdfReport() {
         'ph', 'targetPh', 'freeChlorine', 'targetFreeChlorine', 'alkalinity', 'targetAlkalinity',
         'calciumHardness', 'targetCalcium', 'cyanuricAcid', 'targetCya', 'salt', 'targetSalt',
         'temperature', 'phosphates',
+        'visitFrequencyDays', 'siteMemoryText', 'contextExtraNote',
+        'ctxOwnerChemicals', 'ctxNoCirculation', 'ctxHeavySun', 'ctxHighBatherLoad', 'ctxRainDilution', 'ctxTopUpOff',
+        'assetType', 'assetId', 'assetLocation', 'assetStatus', 'assetNote',
+        'closedSite', 'closedSystemName', 'closedTechnician', 'closedDate', 'closedTime', 'closedVisitInterval', 'closedNotes',
+        'hhwTds', 'hhwTdsMin', 'hhwTdsMax', 'hhwPh', 'hhwPhMin', 'hhwPhMax', 'hhwInhibitor', 'hhwInhibitorMin', 'hhwInhibitorMax',
+        'chwTds', 'chwTdsMin', 'chwTdsMax', 'chwPh', 'chwPhMin', 'chwPhMax', 'chwInhibitor', 'chwInhibitorMin', 'chwInhibitorMax',
         'iceBath1Clarity', 'iceBath1Ph', 'iceBath1Fc', 'iceBath1Alk', 'iceBath1Temp', 'iceBath1Note',
         'iceBath2Clarity', 'iceBath2Ph', 'iceBath2Fc', 'iceBath2Alk', 'iceBath2Temp', 'iceBath2Note',
         'iceBath3Clarity', 'iceBath3Ph', 'iceBath3Fc', 'iceBath3Alk', 'iceBath3Temp', 'iceBath3Note'
@@ -3406,6 +4383,34 @@ async function savePdfReport() {
       });
       qs('generateReportBtn').addEventListener('click', renderReport);
       qs('saveReportBtn').addEventListener('click', savePdfReport);
+      qs('saveVisitSnapshotBtn').addEventListener('click', savePoolVisitSnapshot);
+      qs('generateClosedReportBtn').addEventListener('click', renderClosedLoopReport);
+      qs('saveClosedReportBtn').addEventListener('click', saveClosedLoopPdfReport);
+      qs('saveClosedSnapshotBtn').addEventListener('click', saveClosedLoopSnapshot);
+      qs('saveSiteMemoryBtn').addEventListener('click', saveCurrentSiteMemory);
+      qs('saveInsightSnapshotBtn').addEventListener('click', savePoolVisitSnapshot);
+      qs('saveAssetBtn').addEventListener('click', saveAsset);
+      qs('exportDataBtn').addEventListener('click', () => {
+        const payload = {
+          state: loadJson(STORAGE_KEY, {}),
+          stock: loadStockState(),
+          history: getHistoryState(),
+          closedLoopHistory: getClosedLoopHistoryState(),
+          siteMemory: getSiteMemoryState(),
+          assets: getAssetState()
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        saveBlob(blob, `mbs-app-data-${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+      });
+      qs('clearHistoryBtn').addEventListener('click', () => {
+        localStorage.removeItem(HISTORY_STORAGE_KEY);
+        localStorage.removeItem(CLOSED_LOOP_HISTORY_KEY);
+        renderInsightsSection();
+      });
+      qs('clearAssetsBtn').addEventListener('click', () => {
+        localStorage.removeItem(ASSET_STORAGE_KEY);
+        renderAssetSection();
+      });
       qs('resetBtn').addEventListener('click', resetAll);
       qs('loadDefaultsBtn').addEventListener('click', () => {
         loadPoolDefaults();
