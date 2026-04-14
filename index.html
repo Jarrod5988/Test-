@@ -1529,15 +1529,6 @@
             <input id="phosphates" type="number" inputmode="decimal" step="1" placeholder="ppb" />
           </div>
         </div>
-        <div class="subcard" style="margin-top: 12px;">
-          <h3>Quick actions</h3>
-          <div class="actions" style="margin-bottom: 10px;">
-            <button class="button secondary" id="noIssuesTodayBtn" type="button">No issues today</button>
-            <button class="button ghost" id="clearQuickActionsBtn" type="button">Clear actions</button>
-          </div>
-          <div id="quickActionsWrap" class="check-grid"></div>
-          <div id="draftStatusBanner" class="hint" style="margin-top: 12px;">Incomplete visits auto-save on this device.</div>
-        </div>
 
       </section>
 
@@ -1628,6 +1619,16 @@
         </div>
       </section>
 </section>
+
+      <section class="card span-12" id="quickActionsCard">
+        <h2>Quick actions</h2>
+        <div class="actions" style="margin-bottom: 10px;">
+          <button class="button secondary" id="noIssuesTodayBtn" type="button">No issues today</button>
+          <button class="button ghost" id="clearQuickActionsBtn" type="button">Clear actions</button>
+        </div>
+        <div id="quickActionsWrap" class="check-grid"></div>
+        <div id="draftStatusBanner" class="hint" style="margin-top: 12px;">Incomplete visits auto-save on this device.</div>
+      </section>
 
       <section class="card span-12" id="singleCombinedCard">
         <h2>Combined water balance and dosing</h2>
