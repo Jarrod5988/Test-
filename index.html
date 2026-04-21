@@ -2248,11 +2248,19 @@
       return custom && custom > 0 ? custom : (auto || 0);
     }
 
+    function getLocalDateInputValue(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
     function setDefaultDateTime() {
       const now = new Date();
-      if (inputs.reportDate && !inputs.reportDate.value) inputs.reportDate.value = now.toISOString().slice(0, 10);
+      const today = getLocalDateInputValue(now);
+      if (inputs.reportDate && !inputs.reportDate.value) inputs.reportDate.value = today;
       if (inputs.testTime && !inputs.testTime.value) inputs.testTime.value = now.toTimeString().slice(0, 5);
-      if (inputs.closedDate && !inputs.closedDate.value) inputs.closedDate.value = now.toISOString().slice(0, 10);
+      if (inputs.closedDate && !inputs.closedDate.value) inputs.closedDate.value = today;
       if (inputs.closedTime && !inputs.closedTime.value) inputs.closedTime.value = now.toTimeString().slice(0, 5);
     }
 
@@ -2814,7 +2822,7 @@
         poolKey: pool.key,
         poolName: pool.poolName,
         site: inputs.reportSite.value || pool.site || '',
-        date: inputs.reportDate.value || now.toISOString().slice(0, 10),
+        date: inputs.reportDate.value || getLocalDateInputValue(now),
         time: inputs.testTime.value || now.toTimeString().slice(0, 5),
         clarity: inputs.waterClarity.value || '',
         ph: n(inputs.ph.value),
@@ -3679,7 +3687,7 @@
       const { doses, volume } = buildRecommendationRows();
       const dosedChemicals = model.chemicalRows
         .filter(row => row.dosed === 'Yes' && Number.isFinite(row.value) && row.value > 0)
-        .map(row => `${row.name}: ${row.qty} ${row.unit}${row.notes ? ` (${row.notes})` : ''}`);
+        .map(row => `${row.name}: ${row.qty} ${row.unit}${row.sourceLabel ? ` from ${row.sourceLabel}` : ''}${row.notes ? ` (${row.notes})` : ''}`);
       const siteMemory = getSiteMemoryState()[pool.key] || '';
       const notesParts = [
         ...getQuickActionSentences(),
@@ -5032,7 +5040,7 @@
         const sourceLabel = snapshot.status === 'yes' ? getDoseSourceLabel(snapshot.source) : '';
         return {
           name: item.label,
-          displayName: sourceLabel ? `${item.label} (${sourceLabel})` : item.label,
+          displayName: item.label,
           qty: Number.isFinite(item.value) && item.value > 0 ? formatNumber(roundDoseUp(item.value), 0) : '',
           unit: item.unit,
           reason,
@@ -5041,7 +5049,8 @@
           key: item.key,
           value: item.value,
           decimals: item.decimals,
-          sourceLabel
+          sourceLabel,
+          source: sourceLabel || '-'
         };
       });
 
@@ -5049,7 +5058,11 @@
         .filter(row => row.dosed === 'Yes' && Number.isFinite(row.value) && row.value > 0);
 
       const chemicalsAdded = chemicalRows
-        .map(row => buildCorrectiveSentence({ key: row.key, label: row.name, value: row.value, unit: row.unit, decimals: row.decimals }, row.reason));
+        .map(row => {
+          const baseSentence = buildCorrectiveSentence({ key: row.key, label: row.name, value: row.value, unit: row.unit, decimals: row.decimals }, row.reason);
+          if (!baseSentence) return '';
+          return row.sourceLabel ? `${baseSentence} Source: ${row.sourceLabel}.` : baseSentence;
+        });
 
       const correctiveActions = chemicalRows
         .map(row => buildCorrectiveSentence({ key: row.key, label: row.name, value: row.value, unit: row.unit, decimals: row.decimals }, row.reason))
@@ -5102,7 +5115,7 @@
       lines.push('');
       lines.push('Chemical Dosing Log');
       if (model.chemicalRows.length) {
-        model.chemicalRows.forEach(row => lines.push(`${row.displayName || row.name} | ${row.qty} ${row.unit} | ${row.reason} | Dosed: ${row.dosed}${row.notes ? ` | ${row.notes}` : ''}`));
+        model.chemicalRows.forEach(row => lines.push(`${row.displayName || row.name} | ${row.qty} ${row.unit} | ${row.reason} | Dosed: ${row.dosed} | Source: ${row.source || '-'}${row.notes ? ` | ${row.notes}` : ''}`));
       } else {
         lines.push('No chemicals were used.');
       }
@@ -5209,11 +5222,12 @@ function buildReportHtml() {
           <table class="report-table">
             <thead>
               <tr>
-                <th style="width: 22%;">Chemical used</th>
+                <th style="width: 20%;">Chemical used</th>
                 <th style="width: 8%;">Qty</th>
                 <th style="width: 8%;">Unit</th>
-                <th style="width: 24%;">Reason</th>
+                <th style="width: 22%;">Reason</th>
                 <th style="width: 8%;">Dosed?</th>
+                <th style="width: 14%;">Stock source</th>
                 <th>Notes</th>
               </tr>
             </thead>
@@ -5225,11 +5239,12 @@ function buildReportHtml() {
                   <td>${escapeHtml(row.unit)}</td>
                   <td>${escapeHtml(row.reason)}</td>
                   <td>${escapeHtml(row.dosed)}</td>
+                  <td>${escapeHtml(row.source || '-')}</td>
                   <td>${escapeHtml(row.notes)}</td>
                 </tr>
               `).join('') : `
                 <tr>
-                  <td colspan="6">No chemicals were used.</td>
+                  <td colspan="7">No chemicals were used.</td>
                 </tr>
               `}
             </tbody>
@@ -5779,16 +5794,16 @@ async function savePdfReport() {
       y += 4;
       y = drawSectionBar('Chemical Dosing Log', y);
       const chemicalRows = model.chemicalRows.length
-        ? model.chemicalRows.map(row => [row.displayName || row.name, row.qty, row.unit, row.reason, row.dosed, row.notes])
-        : [['No chemicals were used.', '', '', '', '', '']];
+        ? model.chemicalRows.map(row => [row.displayName || row.name, row.qty, row.unit, row.reason, row.dosed, row.source || '-', row.notes])
+        : [['No chemicals were used.', '', '', '', '', '', '']];
       y = drawTable(
         doc,
         margin,
         y,
-        [60, 18, 16, 54, 18, pageWidth - (margin * 2) - 60 - 18 - 16 - 54 - 18],
-        ['Chemical used', 'Qty', 'Unit', 'Reason', 'Dosed?', 'Notes'],
+        [52, 18, 14, 46, 16, 28, pageWidth - (margin * 2) - 52 - 18 - 14 - 46 - 16 - 28],
+        ['Chemical used', 'Qty', 'Unit', 'Reason', 'Dosed?', 'Stock source', 'Notes'],
         chemicalRows,
-        { fontSize: 7.8, headerFontSize: 7.8, striped: true }
+        { fontSize: 7.6, headerFontSize: 7.6, striped: true }
       );
 
       const blockGap = 6;
@@ -6553,9 +6568,15 @@ async function savePdfReport() {
     function loadState() {
       try {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        const savedAt = stored && stored.__draftSavedAt ? new Date(stored.__draftSavedAt) : null;
+        const hasValidSavedAt = savedAt instanceof Date && !Number.isNaN(savedAt.getTime());
+        const isSameLocalDay = hasValidSavedAt && getLocalDateInputValue(savedAt) === getLocalDateInputValue(new Date());
+        const dateTimeFields = new Set(['reportDate', 'testTime', 'closedDate', 'closedTime']);
+
         Object.keys(inputs).forEach(key => {
           if (!inputs[key]) return;
           if (stored[key] == null) return;
+          if (dateTimeFields.has(key) && !isSameLocalDay) return;
           if (inputs[key].type === 'checkbox') inputs[key].checked = Boolean(stored[key]);
           else inputs[key].value = stored[key];
         });
