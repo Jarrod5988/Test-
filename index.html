@@ -5062,20 +5062,20 @@
           const baseSentence = buildCorrectiveSentence({ key: row.key, label: row.name, value: row.value, unit: row.unit, decimals: row.decimals }, row.reason);
           if (!baseSentence) return '';
           return row.sourceLabel ? `${baseSentence} Source: ${row.sourceLabel}.` : baseSentence;
-        });
-
-      const correctiveActions = chemicalRows
-        .map(row => buildCorrectiveSentence({ key: row.key, label: row.name, value: row.value, unit: row.unit, decimals: row.decimals }, row.reason))
+        })
         .filter(Boolean);
 
+      const additionalComments = [];
       const serviceNotes = (inputs.serviceNotes.value || '').trim();
       const contextTags = getContextTags();
       const quickActionSentences = getQuickActionSentences();
       const siteMemory = getSiteMemoryState()[getSelectedPool().key] || '';
-      if (quickActionSentences.length) correctiveActions.push(...quickActionSentences);
-      if (serviceNotes) correctiveActions.push(serviceNotes);
-      if (contextTags.length) correctiveActions.push(`Service context: ${contextTags.join('; ')}.`);
-      if (siteMemory) correctiveActions.push(`Site memory: ${siteMemory}`);
+      if (quickActionSentences.length) additionalComments.push(...quickActionSentences);
+      if (serviceNotes) additionalComments.push(serviceNotes);
+      if (contextTags.length) additionalComments.push(`Service context: ${contextTags.join('; ')}.`);
+      if (siteMemory) additionalComments.push(`Site memory: ${siteMemory}`);
+
+      const combinedComments = [...chemicalsAdded, ...additionalComments];
 
       return {
         title: 'Water Quality Testing Report',
@@ -5089,8 +5089,9 @@
         summaryItems,
         spinTouchRows,
         chemicalRows,
+        combinedCommentsText: combinedComments.length ? combinedComments.join(' ') : 'No comments recorded.',
         chemicalsAddedText: chemicalsAdded.length ? chemicalsAdded.join(' ') : 'No chemicals were marked as added.',
-        correctiveActionsText: correctiveActions.length ? correctiveActions.join(' ') : 'No corrective dosing required based on the entered results.',
+        correctiveActionsText: combinedComments.length ? combinedComments.join(' ') : 'No comments recorded.',
         footerText: 'Generated from the calculator   Page 1 of 1'
       };
     }
@@ -5120,11 +5121,8 @@
         lines.push('No chemicals were used.');
       }
       lines.push('');
-      lines.push('Chemicals Added');
-      lines.push(model.chemicalsAddedText);
-      lines.push('');
-      lines.push('Corrective Action / Technician Notes');
-      lines.push(model.correctiveActionsText);
+      lines.push('Comments');
+      lines.push(model.combinedCommentsText);
       return lines.join('\n');
     }
 
@@ -5250,16 +5248,9 @@ function buildReportHtml() {
             </tbody>
           </table>
 
-          <div class="report-sections-grid">
-            <div class="report-section-block">
-              <div class="report-section-block-title">Chemicals Added</div>
-              <div class="report-paragraph">${escapeHtml(model.chemicalsAddedText)}</div>
-            </div>
-
-            <div class="report-section-block">
-              <div class="report-section-block-title">Corrective Action / Technician Notes</div>
-              <div class="report-paragraph">${escapeHtml(model.correctiveActionsText)}</div>
-            </div>
+          <div class="report-section-block" style="margin-top: 12px;">
+            <div class="report-section-block-title">Comments</div>
+            <div class="report-paragraph">${escapeHtml(model.combinedCommentsText)}</div>
           </div>
 
           <div class="report-footer">${escapeHtml(model.footerText)}</div>
@@ -5806,16 +5797,21 @@ async function savePdfReport() {
         { fontSize: 7.6, headerFontSize: 7.6, striped: true }
       );
 
-      const blockGap = 6;
       const blockY = y + 6;
-      const blockW = ((pageWidth - (margin * 2)) - blockGap) / 2;
-      const leftBlockX = margin;
-      const rightBlockX = margin + blockW + blockGap;
+      const blockX = margin;
+      const blockW = pageWidth - (margin * 2);
 
       const drawTextBlock = (x, yPos, w, title, body) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.2);
+        const lines = doc.splitTextToSize(String(body || ''), w - 6);
+        const bodyLineHeight = 4;
+        const bodyHeight = Math.max(18, lines.length * bodyLineHeight);
+        const boxHeight = 12 + bodyHeight;
+
         doc.setDrawColor(...borderBlue);
         doc.setFillColor(255, 255, 255);
-        doc.roundedRect(x, yPos, w, 30, 2.5, 2.5, 'FD');
+        doc.roundedRect(x, yPos, w, boxHeight, 2.5, 2.5, 'FD');
         doc.setFillColor(...blue);
         doc.roundedRect(x, yPos, w, 7.5, 2.5, 2.5, 'F');
         doc.rect(x, yPos + 4.5, w, 3, 'F');
@@ -5826,12 +5822,10 @@ async function savePdfReport() {
         doc.setTextColor(31, 41, 55);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.2);
-        const lines = doc.splitTextToSize(String(body || ''), w - 6);
         doc.text(lines, x + 3, yPos + 12);
       };
 
-      drawTextBlock(leftBlockX, blockY, blockW, 'Chemicals Added', model.chemicalsAddedText);
-      drawTextBlock(rightBlockX, blockY, blockW, 'Corrective Action / Technician Notes', model.correctiveActionsText);
+      drawTextBlock(blockX, blockY, blockW, 'Comments', model.combinedCommentsText);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
