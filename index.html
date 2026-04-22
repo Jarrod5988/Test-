@@ -1455,12 +1455,16 @@
         <div class="grid" style="gap: 12px;">
           <div class="span-6" id="singlePhotoCaptureBlock" style="grid-column: span 12;">
             <div class="button-row" style="margin-bottom: 10px; flex-wrap: wrap;">
+              <label class="button secondary" for="photoInputCamera" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                Take Spin Touch photo
+              </label>
               <label class="button secondary" for="photoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
-                Add Spin Touch photo
+                Choose from photo library
               </label>
               <button class="button secondary" type="button" id="scanPhotoBtn">Read results from photo</button>
               <button class="button ghost" type="button" id="clearPhotoBtn">Clear photo</button>
-              <input id="photoInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="photoInputCamera" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="photoInput" type="file" accept="image/*" class="hidden" />
             </div>
             <div class="preview-box" id="photoPreviewBox">
               <div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>
@@ -1556,10 +1560,12 @@
             <h3>Raiders Ice Bath 1</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
             <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
-              <label class="button secondary" for="iceBath1PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Add photo</label>
+              <label class="button secondary" for="iceBath1PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
+              <label class="button secondary" for="iceBath1PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Choose from library</label>
               <button class="button secondary" type="button" id="scanIceBath1PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath1PhotoBtn">Clear photo</button>
-              <input id="iceBath1PhotoInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="iceBath1PhotoCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="iceBath1PhotoInput" type="file" accept="image/*" class="hidden" />
             </div>
             <div class="preview-box" id="iceBath1PhotoPreviewBox" style="min-height:160px;">
               <div class="placeholder">No photo attached for Ice Bath 1.</div>
@@ -1582,10 +1588,12 @@
             <h3>Raiders Ice Bath 2</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
             <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
-              <label class="button secondary" for="iceBath2PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Add photo</label>
+              <label class="button secondary" for="iceBath2PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
+              <label class="button secondary" for="iceBath2PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Choose from library</label>
               <button class="button secondary" type="button" id="scanIceBath2PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath2PhotoBtn">Clear photo</button>
-              <input id="iceBath2PhotoInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="iceBath2PhotoCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="iceBath2PhotoInput" type="file" accept="image/*" class="hidden" />
             </div>
             <div class="preview-box" id="iceBath2PhotoPreviewBox" style="min-height:160px;">
               <div class="placeholder">No photo attached for Ice Bath 2.</div>
@@ -1608,10 +1616,12 @@
             <h3>Raiders Ice Bath 3</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
             <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
-              <label class="button secondary" for="iceBath3PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Add photo</label>
+              <label class="button secondary" for="iceBath3PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
+              <label class="button secondary" for="iceBath3PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Choose from library</label>
               <button class="button secondary" type="button" id="scanIceBath3PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath3PhotoBtn">Clear photo</button>
-              <input id="iceBath3PhotoInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="iceBath3PhotoCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
+              <input id="iceBath3PhotoInput" type="file" accept="image/*" class="hidden" />
             </div>
             <div class="preview-box" id="iceBath3PhotoPreviewBox" style="min-height:160px;">
               <div class="placeholder">No photo attached for Ice Bath 3.</div>
@@ -2162,7 +2172,9 @@
 
     const inputs = {};
     let photoDataUrl = '';
+    let currentPhotoFile = null;
     const iceBathPhotoData = { 1: '', 2: '', 3: '' };
+    const iceBathPhotoFiles = { 1: null, 2: null, 3: null };
 
     function qs(id) {
       return document.getElementById(id);
@@ -5843,15 +5855,15 @@ async function savePdfReport() {
 
 
     const OCR_LABELS = {
-      freeChlorine: ['free chlorine', 'fcl', 'fci', 'fel', 'fol', 'fck'],
-      ph: ['p h', 'ph'],
-      alkalinity: ['total alkalinity', 'alkalinity', 'alk'],
-      calciumHardness: ['calcium hardness', 'hardness', 'hard', 'hard.'],
-      cyanuricAcid: ['cyanuric acid', 'cya', 'cva', 'stabiliser', 'stabilizer'],
-      salt: ['salt', 'sodium chloride'],
-      temperature: ['temperature', 'temp'],
+      freeChlorine: ['free chlorine', 'free cl', 'free ci', 'chlorine free', 'chlorine', 'fcl', 'fci', 'fel', 'fol', 'fck'],
+      ph: ['p h', 'p.h', 'ph', 'ph.'],
+      alkalinity: ['total alkalinity', 'total alk', 'tot alk', 'tot. alk', 'alkalinity', 'alk'],
+      calciumHardness: ['calcium hardness', 'cal hardness', 'calc hardness', 'total hardness', 'hardness', 'hard', 'hard.'],
+      cyanuricAcid: ['cyanuric acid', 'cyanuric', 'cy acid', 'cya', 'cva', 'stabiliser', 'stabilizer'],
+      salt: ['salt', 'salinity', 'sodium chloride'],
+      temperature: ['temperature', 'water temperature', 'water temp', 'temp'],
       copper: ['copper', 'cu'],
-      phosphates: ['phosphates', 'phosphate', 'phos']
+      phosphates: ['phosphates', 'phosphate', 'ortho phosphate', 'orthophosphate', 'phos']
     };
 
     function setPhotoStatus(message, tone = 'info') {
@@ -5867,19 +5879,33 @@ async function savePdfReport() {
         .replace(/[\u201C\u201D]/g, '"')
         .replace(/[\u2013\u2014]/g, '-')
         .replace(/[\u00A0]/g, ' ')
+        .replace(/[°]/g, ' ')
         .replace(/[,]/g, '.')
         .replace(/\r/g, '\n')
         .replace(/[ \t]+/g, ' ');
     }
 
+    function cleanOcrLabelText(text) {
+      return normaliseOcrText(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
     function normaliseNumericToken(raw) {
-      const cleaned = String(raw || '')
+      let cleaned = String(raw || '')
         .replace(/[OoQq]/g, '0')
         .replace(/[lI|]/g, '1')
         .replace(/[^0-9.\-]/g, '');
       if (!cleaned) return null;
-      const valueString = cleaned.startsWith('.') ? `0${cleaned}` : cleaned;
-      const value = Number(valueString);
+      if ((cleaned.match(/\./g) || []).length > 1) {
+        const parts = cleaned.split('.').filter(Boolean);
+        cleaned = parts.length ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned.replace(/\.+/g, '.');
+      }
+      if (cleaned.startsWith('.')) cleaned = `0${cleaned}`;
+      if (cleaned.startsWith('-.')) cleaned = cleaned.replace('-.', '-0.');
+      const value = Number(cleaned);
       return Number.isFinite(value) ? value : null;
     }
 
@@ -5920,7 +5946,7 @@ async function savePdfReport() {
           if (value >= 1 && value < 10) return Math.round(value);
         }
         if (key === 'salt') {
-          if (value >= 100 && value <= 10000) return Math.round(value);
+          if (value >= 0 && value <= 10000) return Math.round(value);
           if (value > 10 && value < 100) return Math.round(value * 100);
         }
         if (key === 'temperature') {
@@ -5957,7 +5983,7 @@ async function savePdfReport() {
         return adjusted.find(value => value >= 0 && value <= 300) ?? adjusted[0];
       }
       if (key === 'salt') {
-        return adjusted.find(value => value >= 100 && value <= 10000) ?? adjusted[0];
+        return adjusted.find(value => value >= 0 && value <= 10000) ?? adjusted[0];
       }
       if (key === 'temperature') {
         return adjusted.find(value => value >= 0 && value <= 60) ?? adjusted[0];
@@ -5979,9 +6005,10 @@ async function savePdfReport() {
       const normalised = normaliseOcrText(text);
       const candidates = [];
       const labels = OCR_LABELS[key] || [];
+      const cleanedLabels = labels.map(label => cleanOcrLabelText(label)).filter(Boolean);
       labels.forEach(label => {
         const labelPattern = escapeRegex(label).replace(/\s+/g, '\\s*');
-        const regex = new RegExp(`${labelPattern}[\\s:=\\-]{0,6}([0-9OoQqIl|.]{1,8})`, 'ig');
+        const regex = new RegExp(`${labelPattern}[^0-9\\n\\r]{0,16}([0-9OoQqIl|.]{1,12})`, 'ig');
         let match;
         while ((match = regex.exec(normalised)) !== null) {
           const value = normaliseNumericToken(match[1]);
@@ -5991,8 +6018,9 @@ async function savePdfReport() {
 
       const lines = normalised.split(/\n+/).map(line => line.trim()).filter(Boolean);
       lines.forEach(line => {
-        const compact = line.toLowerCase();
-        const hasLabel = labels.some(label => compact.includes(label.toLowerCase()));
+        const compact = cleanOcrLabelText(line);
+        const squashed = compact.replace(/\s+/g, '');
+        const hasLabel = cleanedLabels.some(label => compact.includes(label) || squashed.includes(label.replace(/\s+/g, '')));
         if (!hasLabel) return;
         extractNumbersFromText(line).forEach(value => candidates.push(value));
       });
@@ -6010,10 +6038,13 @@ async function savePdfReport() {
       return results;
     }
 
-    function mergeSpinTouchResults(resultSets) {
+    function mergeSpinTouchResults(resultSets, rawTexts = []) {
       const merged = {};
       Object.keys(OCR_LABELS).forEach(key => {
         const allCandidates = [];
+        rawTexts.forEach(text => {
+          extractCandidatesForKey(text, key).forEach(value => allCandidates.push(value));
+        });
         resultSets.forEach(set => {
           if (set && set[key] != null) allCandidates.push(set[key]);
         });
@@ -6407,6 +6438,7 @@ async function savePdfReport() {
         setStatus(assessment.readingMessage);
         const ocrJobs = buildSpinTouchOcrCanvases(sourceCanvas);
         const resultSets = [];
+        const rawTexts = [];
 
         for (let i = 0; i < ocrJobs.length; i += 1) {
           const job = ocrJobs[i];
@@ -6418,11 +6450,13 @@ async function savePdfReport() {
             tessedit_pageseg_mode: job.psm,
             preserve_interword_spaces: '1'
           });
-          const parsed = parseSpinTouchResults(data && data.text ? data.text : '');
+          const rawText = data && data.text ? data.text : '';
+          rawTexts.push(rawText);
+          const parsed = parseSpinTouchResults(rawText);
           resultSets.push(parsed);
         }
 
-        const results = mergeSpinTouchResults(resultSets);
+        const results = mergeSpinTouchResults(resultSets, rawTexts);
         return { populated: 0, results, assessment };
       } finally {
         if (button) {
@@ -6433,7 +6467,7 @@ async function savePdfReport() {
     }
 
     async function scanSpinTouchPhoto() {
-      const file = qs('photoInput').files && qs('photoInput').files[0];
+      const file = currentPhotoFile || (qs('photoInput').files && qs('photoInput').files[0]) || (qs('photoInputCamera').files && qs('photoInputCamera').files[0]);
       const scanBtn = qs('scanPhotoBtn');
       if (!file) {
         setPhotoStatus('Add a Spin Touch photo first, then try again.', 'error');
@@ -6469,7 +6503,8 @@ async function savePdfReport() {
 
     async function scanSpinTouchPhotoForIceBath(index) {
       const fileInput = qs(`iceBath${index}PhotoInput`);
-      const file = fileInput && fileInput.files && fileInput.files[0];
+      const cameraInput = qs(`iceBath${index}PhotoCameraInput`);
+      const file = iceBathPhotoFiles[index] || (fileInput && fileInput.files && fileInput.files[0]) || (cameraInput && cameraInput.files && cameraInput.files[0]);
       const scanBtn = qs(`scanIceBath${index}PhotoBtn`);
       if (!file) {
         setIceBathPhotoStatus(index, `Add a Spin Touch photo for Ice Bath ${index} first, then try again.`, 'error');
@@ -6503,6 +6538,12 @@ async function savePdfReport() {
     function handleIceBathPhotoUpload(index, event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      iceBathPhotoFiles[index] = file;
+      const otherInputId = event.target.id === `iceBath${index}PhotoInput`
+        ? `iceBath${index}PhotoCameraInput`
+        : `iceBath${index}PhotoInput`;
+      const otherInput = qs(otherInputId);
+      if (otherInput) otherInput.value = '';
       const reader = new FileReader();
       reader.onload = () => {
         iceBathPhotoData[index] = reader.result;
@@ -6516,9 +6557,12 @@ async function savePdfReport() {
 
     function clearIceBathPhoto(index) {
       iceBathPhotoData[index] = '';
+      iceBathPhotoFiles[index] = null;
       const input = qs(`iceBath${index}PhotoInput`);
+      const cameraInput = qs(`iceBath${index}PhotoCameraInput`);
       const preview = qs(`iceBath${index}PhotoPreviewBox`);
       if (input) input.value = '';
+      if (cameraInput) cameraInput.value = '';
       if (preview) preview.innerHTML = `<div class="placeholder">No photo attached for Ice Bath ${index}.</div>`;
       setIceBathPhotoStatus(index, `Add a Spin Touch photo for Ice Bath ${index} and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.`);
     }
@@ -6593,6 +6637,7 @@ async function savePdfReport() {
       populatePoolSelect();
       inputs.poolSelect.value = POOLS[0].key;
       photoDataUrl = '';
+      currentPhotoFile = null;
       [1, 2, 3].forEach(index => clearIceBathPhoto(index));
       qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
       setPhotoStatus('Upload a Spin Touch photo and the app will try to fill free chlorine, pH, alkalinity, calcium hardness, CYA, salt, temperature, copper and phosphates automatically.');
@@ -6628,6 +6673,10 @@ async function savePdfReport() {
     function handlePhotoUpload(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
+      currentPhotoFile = file;
+      const otherInputId = event.target.id === 'photoInput' ? 'photoInputCamera' : 'photoInput';
+      const otherInput = qs(otherInputId);
+      if (otherInput) otherInput.value = '';
       const reader = new FileReader();
       reader.onload = () => {
         photoDataUrl = reader.result;
@@ -6689,18 +6738,23 @@ async function savePdfReport() {
       });
 
       qs('photoInput').addEventListener('change', handlePhotoUpload);
+      qs('photoInputCamera').addEventListener('change', handlePhotoUpload);
       qs('scanPhotoBtn').addEventListener('click', scanSpinTouchPhoto);
       qs('clearPhotoBtn').addEventListener('click', () => {
         photoDataUrl = '';
+        currentPhotoFile = null;
         qs('photoInput').value = '';
+        qs('photoInputCamera').value = '';
         qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
         setPhotoStatus('Upload a Spin Touch photo and the app will try to fill free chlorine, pH, alkalinity, calcium hardness, CYA, salt, temperature, copper and phosphates automatically.');
       });
       [1, 2, 3].forEach(index => {
         const photoInput = qs(`iceBath${index}PhotoInput`);
+        const photoCameraInput = qs(`iceBath${index}PhotoCameraInput`);
         const scanBtn = qs(`scanIceBath${index}PhotoBtn`);
         const clearBtn = qs(`clearIceBath${index}PhotoBtn`);
         if (photoInput) photoInput.addEventListener('change', event => handleIceBathPhotoUpload(index, event));
+        if (photoCameraInput) photoCameraInput.addEventListener('change', event => handleIceBathPhotoUpload(index, event));
         if (scanBtn) scanBtn.addEventListener('click', () => scanSpinTouchPhotoForIceBath(index));
         if (clearBtn) clearBtn.addEventListener('click', () => clearIceBathPhoto(index));
       });
