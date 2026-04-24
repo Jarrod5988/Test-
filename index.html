@@ -22,18 +22,39 @@
       --brand: #49b9ff;
       --blue: #2b96ff;
       --blue-dark: #153e69;
-      --blue-light: rgba(43, 150, 255, 0.10);
+      /* Lighten the subtle blue tint used for hover states.  A lower
+       * opacity yields a softer highlight on interactive elements. */
+      --blue-light: rgba(43, 150, 255, 0.08);
       --line: rgba(103, 156, 214, 0.20);
       --text: #17324d;
       --muted: #627b96;
-      --bg: #edf5fc;
-      --card: rgba(255, 255, 255, 0.90);
+      /* Use a brighter, almost‑white page background for a cleaner look. */
+      --bg: #f7fafe;
+      /* Increase card opacity for better contrast against the new page
+       * background.  Cards are now near‑white for a crisp, modern feel. */
+      --card: rgba(255, 255, 255, 0.97);
       --good: #15945e;
       --warn: #b8750d;
       --bad: #c94b4b;
       --shadow: 0 12px 28px rgba(72, 109, 149, 0.08);
       --radius: 22px;
     }
+
+  /* Dark mode variables override the default light palette when the
+     `data-theme="dark"` attribute is present on the body element.  This
+     enables a low‑contrast, comfortable viewing experience ideal for
+     nighttime or low‑light environments.  Colours are tuned to
+     maintain sufficient contrast while matching the brand’s blue
+     accent. */
+  [data-theme="dark"] {
+    --bg: #0f1e33;
+    --card: rgba(20, 32, 55, 0.96);
+    --text: #e5efff;
+    --muted: #94aac4;
+    --line: rgba(99, 130, 170, 0.35);
+    --blue-light: rgba(43, 150, 255, 0.15);
+    --shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  }
 
     * { box-sizing: border-box; }
 
@@ -45,6 +66,20 @@
         radial-gradient(circle at top left, rgba(43, 150, 255, 0.12), transparent 34%),
         radial-gradient(circle at top right, rgba(77, 228, 255, 0.09), transparent 30%),
         linear-gradient(180deg, #f4f9ff 0%, #edf4fb 48%, #f8fbff 100%);
+      color: var(--text);
+    }
+
+    /* Dark mode page background uses deep blues and subtle gradients to
+       maintain depth without overwhelming contrast.  Radial tints
+       provide gentle highlights while the linear gradient creates a
+       smooth transition down the page.  The text colour remains
+       controlled by the --text variable for consistency. */
+    html[data-theme="dark"],
+    body[data-theme="dark"] {
+      background:
+        radial-gradient(circle at top left, rgba(43, 150, 255, 0.08), transparent 34%),
+        radial-gradient(circle at top right, rgba(77, 228, 255, 0.06), transparent 30%),
+        linear-gradient(180deg, #071c33 0%, #0d2a48 48%, #0a1830 100%);
       color: var(--text);
     }
 
@@ -67,6 +102,14 @@
       opacity: 0.24;
     }
 
+    [data-theme="dark"] body::before {
+      background:
+        linear-gradient(rgba(45, 110, 176, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45, 110, 176, 0.08) 1px, transparent 1px);
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.3), transparent 78%);
+      opacity: 0.35;
+    }
+
     .app {
       max-width: 1180px;
       margin: 0 auto;
@@ -86,9 +129,32 @@
       -webkit-backdrop-filter: blur(10px);
     }
 
+    /* Override card and header surfaces in dark mode.  We darken the
+       gradient and adjust the border to maintain separation from the
+       page background. */
+    [data-theme="dark"] .header,
+    [data-theme="dark"] .card {
+      background: linear-gradient(180deg, rgba(20, 32, 55, 0.96) 0%, rgba(15, 29, 49, 0.92) 100%);
+      border-color: rgba(80, 120, 170, 0.35);
+    }
+    [data-theme="dark"] .card h2 {
+      color: #c7d8f3;
+    }
+    [data-theme="dark"] .card h2::before {
+      background: radial-gradient(circle, #4bb0ff 0%, #2a7eff 68%, #193a78 100%);
+      box-shadow: 0 0 16px rgba(40, 100, 180, 0.35);
+    }
+
     .header {
-      padding: 14px 8px 12px;
-      margin-bottom: 14px;
+      /* Compact the header into a horizontal bar.  Display the logo and tagline
+         alongside the action buttons rather than stacking them vertically. */
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
     }
 
     .header::after,
@@ -113,8 +179,12 @@
     }
 
     .brand.brand-header-image {
-      display: block;
-      text-align: center;
+      /* Lay out the logo and tagline horizontally for a compact header.
+         The logo appears on the left, with a small gap to the tagline. */
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
     }
 
     .waterops-header-lockup {
@@ -131,6 +201,19 @@
       height: auto;
     }
 
+    /* Constrain the WaterOps droplet logo inside the header lockup to
+     * prevent it from dominating the page.  A much smaller maximum
+     * width ensures the header remains compact and balanced. */
+    .waterops-header-lockup img {
+      display: block;
+      /* Reduce the maximum width of the droplet logo so it doesn’t dominate
+       * the header.  Using !important ensures this rule overrides any
+       * inline dimensions on the embedded image. */
+      max-width: 90px !important;
+      width: 100%;
+      height: auto;
+    }
+
     .waterops-wordmark {
       filter: drop-shadow(0 10px 22px rgba(43, 150, 255, 0.10));
     }
@@ -141,7 +224,9 @@
     }
 
     .brand-copy-center {
-      text-align: center;
+      /* Align the tagline to the left so it can sit neatly next to the logo
+       * within the header. */
+      text-align: left;
     }
 
     .logo-badge {
@@ -153,9 +238,12 @@
 
     .logo-badge img {
       display: block;
-      width: min(360px, 76vw);
+      /* Constrain the logo to a much smaller width so the header remains
+       * compact.  The height scales automatically to preserve aspect ratio. */
+      width: 100%;
+      max-width: 100px;
+      max-height: 64px;
       height: auto;
-      max-height: 84px;
       object-fit: contain;
     }
 
@@ -177,9 +265,12 @@
     }
 
     .brand-copy-center p {
-      margin: 0 auto;
-      max-width: 700px;
-      font-size: clamp(18px, 2.8vw, 22px);
+      /* Remove the centering and max‑width so the copy flows naturally
+       * next to the logo.  A slightly smaller font size improves
+       * hierarchy and prevents the tagline from dominating the header. */
+      margin: 0;
+      max-width: none;
+      font-size: clamp(16px, 2.2vw, 20px);
       line-height: 1.35;
     }
 
@@ -326,6 +417,61 @@
       background: rgba(255,255,255,0.82);
       color: #1e4f81;
       border: 1px solid rgba(133, 184, 232, 0.28);
+      box-shadow: none;
+    }
+
+    /* Position the theme toggle as a floating circular button near the top
+       right of the page.  This overrides the default button sizing to
+       ensure the control remains compact and easily discoverable.  It
+       inherits colour variables from the current theme. */
+    #themeToggle {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      min-height: 0;
+      padding: 0;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+    }
+
+    #themeToggle svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    [data-theme="dark"] #themeToggle {
+      background: var(--blue);
+      color: #fff;
+      border: none;
+    }
+
+    /* Dark mode button styles ensure contrast on darker surfaces.  Ghost
+       and secondary buttons invert their colours while primary buttons
+       adopt a deeper blue gradient. */
+    [data-theme="dark"] .button {
+      background: linear-gradient(135deg, #2b88e1 0%, #2050a8 100%);
+      color: #ffffff;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    }
+    [data-theme="dark"] .button.secondary {
+      background: linear-gradient(135deg, rgba(58, 100, 157, 0.25) 0%, rgba(48, 85, 139, 0.22) 100%);
+      color: #c7d8f3;
+      border: 1px solid rgba(80, 120, 170, 0.4);
+      box-shadow: none;
+    }
+    [data-theme="dark"] .button.ghost {
+      background: rgba(34, 53, 84, 0.82);
+      color: #c7d8f3;
+      border: 1px solid rgba(80, 120, 170, 0.5);
       box-shadow: none;
     }
 
@@ -811,6 +957,48 @@
       margin-top: 10px;
     }
 
+    /* Removed collapsible subcard styles - not used after redesign. */
+
+    /*
+     * Back to top button
+     *
+     * Adds a small floating button that appears when the user scrolls down the page.
+     * Clicking the button will smoothly scroll the window back to the top. This
+     * improves usability on long pages by providing a quick way to return to the
+     * header without excessive scrolling. The button is hidden by default and
+     * only becomes visible once the user has scrolled a little way down the
+     * page. Styling leverages existing colour variables to maintain brand
+     * consistency.
+     */
+    #backToTop {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background-color: var(--blue);
+      color: #fff;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      line-height: 1;
+      z-index: 1000;
+    }
+
+    [data-theme="dark"] #backToTop {
+      background-color: var(--blue);
+      color: #fff;
+    }
+
+    #backToTop.show {
+      display: flex;
+    }
+
     .mini-pill {
       border-radius: 14px;
       border: 1px solid rgba(137, 183, 226, 0.18);
@@ -818,11 +1006,52 @@
       padding: 10px;
     }
 
+    [data-theme="dark"] .mini-pill {
+      border-color: rgba(80, 120, 170, 0.35);
+      background: rgba(24, 37, 58, 0.9);
+    }
+
     .mini-pill strong {
       display: block;
       font-size: 12px;
       color: var(--muted);
       margin-bottom: 4px;
+    }
+
+    /*
+     * Collapsible cards
+     *
+     * Give users control over long forms by allowing each card to be collapsed.
+     * When collapsed, only the heading remains visible. Clicking the heading
+     * toggles the collapsed state. A small arrow on the heading conveys
+     * whether the section is open (▲) or closed (▼). These rules hide all
+     * immediate children of a card except its <h2> when the card has the
+     * `.collapsed` class. The arrow icons are added via the ::after pseudo
+     * element and swap depending on the collapsed state.
+     */
+    .card h2 {
+      cursor: pointer;
+      position: relative;
+      padding-right: 20px;
+    }
+
+    .card h2::after {
+      content: '\25B2'; /* Upwards triangle */
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--blue-dark);
+      transition: transform 0.2s ease;
+    }
+
+    .card.collapsed h2::after {
+      content: '\25BC'; /* Downwards triangle */
+    }
+
+    .card.collapsed > :not(h2) {
+      display: none;
     }
 
     .icebath-result-cards,
@@ -838,6 +1067,17 @@
       border-radius: 18px;
       padding: 12px;
       background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(244,249,255,0.92) 100%);
+    }
+
+    /* Dark mode overrides for ice bath cards.  Deep gradients and
+       softened border colours provide separation while maintaining a
+       low‑contrast look suitable for night viewing. */
+    [data-theme="dark"] .icebath-result-card {
+      background: linear-gradient(180deg, rgba(24, 37, 58, 0.95) 0%, rgba(20, 32, 55, 0.93) 100%);
+      border-color: rgba(80, 120, 170, 0.35);
+    }
+    [data-theme="dark"] .icebath-result-name {
+      color: #c7d8f3;
     }
 
     .icebath-result-head {
@@ -1405,6 +1645,103 @@
       font-weight: 700;
       color: #1c4771;
     }
+
+    /*
+      Side navigation styles.  The side nav appears on desktop screens and provides a
+      vertical menu for switching between the main screens (Pool testing, Closed loops,
+      Insights, QR & setup).  On mobile it stays hidden and the original horizontal
+      tab bar is used instead.  When visible, it pushes the main app container to
+      the right via margin.
+    */
+    .side-nav {
+      /* Fixed vertical navigation anchored to the left.  The width is
+       * slightly reduced to give more breathing room for the main content.
+       * A brighter background and lighter border provide a clean,
+       * modern look that compliments the rest of the redesign. */
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 200px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(248,251,255,0.96) 100%);
+      border-right: 1px solid rgba(133, 184, 232, 0.16);
+      box-shadow: 0 8px 24px rgba(72, 109, 149, 0.05);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      padding: 60px 12px 20px;
+      gap: 4px;
+    }
+
+    /* Dark mode adjustments for the side navigation.  A deep gradient
+       background anchors the nav on darker screens and improves
+       separation.  The border and text colours are also softened. */
+    [data-theme="dark"] .side-nav {
+      background: linear-gradient(180deg, rgba(15, 29, 49, 0.98) 0%, rgba(13, 25, 43, 0.96) 100%);
+      border-right: 1px solid rgba(80, 120, 170, 0.35);
+    }
+    [data-theme="dark"] .side-nav button {
+      color: #c7d8f3;
+    }
+    [data-theme="dark"] .side-nav button.active {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .side-nav button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      margin-bottom: 4px;
+      border: 0;
+      background: none;
+      font-size: 14px;
+      color: var(--blue-dark);
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Highlight the active navigation item and provide a soft hover state for the rest.
+     * Active items invert their colours for contrast while hovered items use the
+     * gentle tint defined by --blue-light. */
+    .side-nav button.active {
+      background: var(--blue);
+      color: #fff;
+    }
+    .side-nav button.active svg {
+      color: #fff;
+    }
+    .side-nav button:hover:not(.active) {
+      background: var(--blue-light);
+    }
+
+    .side-nav .icon {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    .side-nav svg {
+      color: var(--blue);
+    }
+
+    /* Breakpoint: show the side nav on wider screens and hide the horizontal tab bar */
+    @media (min-width: 860px) {
+      .side-nav {
+        display: flex;
+      }
+      .app {
+        /* Account for the slightly narrower navigation rail plus a small
+         * gutter to keep the content from touching the nav. */
+        margin-left: 210px;
+      }
+      .app-tabs {
+        display: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1421,11 +1758,55 @@
       <div class="toolbar">
         <button class="button ghost" id="resetBtn" type="button">Reset last pool test</button>
         <button class="button secondary" id="loadDefaultsBtn" type="button">Reload pool defaults</button>
+        <!--
+          Theme toggle button.  This discrete control lets the user switch
+          between the default light palette and the optional dark theme.
+          The button is represented by a moon icon when light mode is
+          active and a sun icon when dark mode is active.  The title
+          attribute updates dynamically to reflect the next available
+          mode for accessibility and screen readers.
+        -->
+        <button class="button ghost" id="themeToggle" type="button" title="Switch to dark mode" aria-label="Toggle colour theme">
+          <!-- Moon / Sun icon will be replaced dynamically via JavaScript -->
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path id="themeIcon" fill="currentColor" d="M21.752 15.002A9.998 9.998 0 1112 2a1 1 0 010 2 8 8 0 100 16 9.998 9.998 0 009.752-4.998z"/></svg>
+        </button>
       </div>
     </div>
 
+    <!--
+      Side navigation bar to improve discoverability of the main application modules.  A vertical
+      menu anchors to the left of the page on larger screens and replaces the original
+      horizontal tab bar.  Each button has an icon and descriptive label.  On smaller
+      screens the side‑nav hides automatically and the existing horizontal tabs can still
+      appear (see media queries in the CSS below).
+    -->
+    <nav class="side-nav" id="sideNav">
+      <button class="tab-btn active" type="button" data-screen="pools">
+        <!-- Pool testing icon -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2C7.589 2 4 5.589 4 10s3.589 8 8 8 8-3.589 8-8-3.589-8-8-8zm0 2c1.654 0 3 1.346 3 3s-1.346 3-3 3-3-1.346-3-3S10.346 4 12 4zm0 12c-2.337 0-4.433-1.19-5.651-3h11.303C16.433 14.81 14.337 16 12 16z"/></svg>
+        <span>Pool testing</span>
+      </button>
+      <button class="tab-btn" type="button" data-screen="closedLoops">
+        <!-- Closed loops icon -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17 1H7C5.346 1 4 2.346 4 4v3h2V4c0-.551.448-1 1-1h10c.552 0 1 .449 1 1v3h2V4c0-1.654-1.346-3-3-3zM7 23h10c1.654 0 3-1.346 3-3v-3h-2v3c0 .551-.448 1-1 1H7c-.552 0-1-.449-1-1v-3H4v3c0 1.654 1.346 3 3 3z"/><path fill="currentColor" d="M12 7c-2.757 0-5 2.243-5 5s2.243 5 5 5a1 1 0 000-2c-1.654 0-3-1.346-3-3s1.346-3 3-3 3 1.346 3 3a1 1 0 002 0c0-2.757-2.243-5-5-5z"/><path fill="currentColor" d="M21 11h-2c0-3.312-2.688-6-6-6V3c4.418 0 8 3.582 8 8zM11 5V3c-4.418 0-8 3.582-8 8H1c0-5.523 4.477-10 10-10z"/></svg>
+        <span>Closed loops</span>
+      </button>
+      <button class="tab-btn" type="button" data-screen="insights">
+        <!-- Insights icon (chart) -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 3v18h18v2H3a2 2 0 01-2-2V3h2zm13.242 2.757l2.707 2.707-6.485 6.485L9 11.242l-5 5L2.757 14.5l6.485-6.485L13 12.243l5.242-5.242z"/></svg>
+        <span>Insights</span>
+      </button>
+      <button class="tab-btn" type="button" data-screen="admin">
+        <!-- QR & setup icon (settings) -->
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.936c.047-.303.072-.615.072-.936 0-.321-.025-.633-.074-.936l2.113-1.654a.5.5 0 00.121-.625l-2-3.464a.5.5 0 00-.605-.212l-2.49 1a7.967 7.967 0 00-1.616-.936l-.375-2.65A.5.5 0 0014.7 3h-4a.5.5 0 00-.495.431l-.375 2.65a7.967 7.967 0 00-1.616.936l-2.49-1a.5.5 0 00-.605.212l-2 3.464a.5.5 0 00.121.625l2.113 1.654A7.94 7.94 0 004.786 12c0 .321.025.633.074.936L2.747 14.59a.5.5 0 00-.121.625l2 3.464a.5.5 0 00.605.212l2.49-1c.5.384 1.045.704 1.616.936l.375 2.65A.5.5 0 0010.7 21h4a.5.5 0 00.495-.431l.375-2.65c.571-.232 1.116-.552 1.616-.936l2.49 1a.5.5 0 00.605-.212l2-3.464a.5.5 0 00-.121-.625l-2.113-1.654zM12 15a3 3 0 110-6 3 3 0 010 6z"/></svg>
+        <span>QR & setup</span>
+      </button>
+    </nav>
+
+    <!-- Hide the original horizontal tab bar on wider screens.  When the viewport is narrow (e.g. on mobile), the
+         horizontal tabs remain visible to provide a compact navigation method. -->
     <div class="app-tabs" id="appTabs">
-      <button class="tab-btn active" type="button" data-screen="pools">Pool testing</button>
+      <button class="tab-btn" type="button" data-screen="pools">Pool testing</button>
       <button class="tab-btn" type="button" data-screen="closedLoops">Closed loops</button>
       <button class="tab-btn" type="button" data-screen="insights">Insights & assets</button>
       <button class="tab-btn" type="button" data-screen="admin">QR & setup</button>
@@ -7034,6 +7415,88 @@ async function savePdfReport() {
     }
 
     window.addEventListener('DOMContentLoaded', init);
+  </script>
+  <!-- Back to top button and behaviour -->
+  <button id="backToTop" aria-label="Back to top" title="Back to top">&#8679;</button>
+  <script>
+    (function() {
+      const backToTop = document.getElementById('backToTop');
+      // Toggle visibility based on scroll position
+      window.addEventListener('scroll', () => {
+        if (window.pageYOffset > 300) {
+          backToTop.classList.add('show');
+        } else {
+          backToTop.classList.remove('show');
+        }
+      });
+      // Smooth scroll to top on click
+      backToTop.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    })();
+  </script>
+
+  <!-- Initialize collapsible cards.  This script attaches a click handler to
+       every card heading (h2). Clicking a heading will toggle the
+       `.collapsed` class on its parent card, which hides or reveals the
+       content. The script runs on DOMContentLoaded to ensure the elements
+       exist. -->
+  <script>
+    (function() {
+      function initCollapsibleCards() {
+        document.querySelectorAll('.card > h2').forEach(function(h) {
+          h.addEventListener('click', function() {
+            const card = h.closest('.card');
+            if (card) card.classList.toggle('collapsed');
+          });
+        });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCollapsibleCards);
+      } else {
+        initCollapsibleCards();
+      }
+    })();
+  </script>
+  <!-- Removed collapsible subcard script -->
+
+  <!-- Theme toggle script.  This immediately applies the last stored
+       preference (light or dark) and updates the icon and tooltip when
+       the toggle button is pressed.  The theme preference is stored in
+       localStorage so that it persists across sessions. -->
+  <script>
+    (function() {
+      const toggleBtn = document.getElementById('themeToggle');
+      const iconPath = document.getElementById('themeIcon');
+      if (!toggleBtn || !iconPath) return;
+      // SVG paths for the moon (indicating dark mode is available) and sun
+      // (indicating light mode is available).  These shapes are simple
+      // silhouettes drawn in a single continuous path using currentColor.
+      const MOON_PATH = 'M21.752 15.002A9.998 9.998 0 1112 2a1 1 0 010 2 8 8 0 100 16 9.998 9.998 0 009.752-4.998z';
+      const SUN_PATH  = 'M6.76 4.84l-1.8-1.79 1.42-1.42 1.79 1.8A8 8 0 0120 12a7.72 7.72 0 01-1.79 4.46l1.79 1.79-1.42 1.42-1.79-1.79A8 8 0 0112 20a7.72 7.72 0 01-4.46-1.79l-1.79 1.79-1.42-1.42 1.79-1.79A8 8 0 014 12a7.72 7.72 0 011.79-4.46z';
+      function applyTheme(theme) {
+        const root = document.documentElement;
+        if (theme === 'dark') {
+          root.setAttribute('data-theme', 'dark');
+          iconPath.setAttribute('d', SUN_PATH);
+          toggleBtn.setAttribute('title', 'Switch to light mode');
+        } else {
+          root.removeAttribute('data-theme');
+          iconPath.setAttribute('d', MOON_PATH);
+          toggleBtn.setAttribute('title', 'Switch to dark mode');
+        }
+      }
+      // Determine initial theme: prefer stored setting, then OS preference
+      const storedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      let currentTheme = storedTheme || (prefersDark ? 'dark' : 'light');
+      applyTheme(currentTheme);
+      toggleBtn.addEventListener('click', function() {
+          currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+          localStorage.setItem('theme', currentTheme);
+          applyTheme(currentTheme);
+      });
+    })();
   </script>
 </body>
 </html>
