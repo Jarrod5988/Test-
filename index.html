@@ -2024,7 +2024,7 @@
             <div class="preview-box" id="photoPreviewBox">
               <div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>
             </div>
-            <div class="photo-note" id="photoOcrStatus" style="margin-top: 8px; font-size: 12px;">For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills results in Spin Touch order.</div>
+            <div class="photo-note" id="photoOcrStatus" style="margin-top: 8px; font-size: 12px;">For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills FC, TC, CC, pH, calcium, alk, CYA, copper, salt, phosphates and temperature in Spin Touch order.</div>
           </div>
           <div class="span-6" style="grid-column: span 12;">
             <div class="field">
@@ -2075,6 +2075,15 @@
             <label for="targetFreeChlorine">Target free chlorine</label>
             <input id="targetFreeChlorine" type="number" inputmode="decimal" step="0.01" placeholder="ppm" />
           </div>
+          <div class="field">
+            <label for="totalChlorine">Total chlorine</label>
+            <input id="totalChlorine" type="number" inputmode="decimal" step="0.01" placeholder="ppm" />
+          </div>
+          <div class="field">
+            <label for="combinedChlorine">Combined chlorine</label>
+            <input id="combinedChlorine" type="number" inputmode="decimal" step="0.01" placeholder="ppm" />
+          </div>
+          <div class="span-12 mode-note" style="grid-column: 1 / -1; margin-top: -4px;">Chlorine dosing is calculated from free chlorine only. Total and combined chlorine are recorded as reference readings.</div>
           <div class="field">
             <label for="alkalinity">Current alkalinity</label>
             <input id="alkalinity" type="number" inputmode="decimal" step="1" placeholder="ppm" />
@@ -3055,8 +3064,8 @@
             targetDecimals: 2,
             chemicalLabel: 'liquid chlorine 12.5%',
             increaseVerb: 'raise free chlorine',
-            noDoseText: 'No chlorine increase needed.',
-            highText: ranges.fc ? `Above normal range ${ranges.fc.label}. No chlorine increase needed right now.` : 'No chlorine increase needed.'
+            noDoseText: 'No chlorine increase needed. Dosing is based on free chlorine only.',
+            highText: ranges.fc ? `Above normal range ${ranges.fc.label}. No chlorine increase needed right now. Dosing is based on free chlorine only.` : 'No chlorine increase needed. Dosing is based on free chlorine only.'
           })
         },
         {
@@ -3108,7 +3117,7 @@
           rangeLabel: '-',
           decimals: 2,
           status: getRecordedOnlyStatus(rec.tc),
-          action: rec.tc == null ? 'Enter the total chlorine reading for reference.' : 'Recorded for reference only - no automatic dose calculation.'
+          action: rec.tc == null ? 'Enter the total chlorine reading for reference. Chlorine dosing still uses free chlorine only.' : 'Reference only - chlorine dosing uses free chlorine only.'
         },
         {
           parameter: 'Temperature',
@@ -3259,7 +3268,7 @@
         { result: resultByParameter['Alkalinity'], chemical: chemicalByKey.bicarb },
         { result: resultByParameter['Calcium hardness'], chemical: chemicalByKey.calcium }
       ].filter(item => item.result && item.chemical);
-      const referenceRows = rows.filter(row => ['Total chlorine', 'Temperature', 'Phosphates'].includes(row.parameter));
+      const referenceRows = rows.filter(row => ['Total chlorine', 'Combined chlorine', 'Temperature', 'Phosphates'].includes(row.parameter));
       target.innerHTML = `
         <div class="mini-pill"><strong>Volume</strong>6,000 L each</div>
         <div class="mini-pill"><strong>Clarity</strong>${escapeHtml(rec.clarity)}</div>
@@ -3426,6 +3435,8 @@
         clarity: inputs.waterClarity.value || '',
         ph: n(inputs.ph.value),
         fc: n(inputs.freeChlorine.value),
+        tc: n(inputs.totalChlorine && inputs.totalChlorine.value),
+        cc: n(inputs.combinedChlorine && inputs.combinedChlorine.value),
         alk: n(inputs.alkalinity.value),
         calcium: n(inputs.calciumHardness.value),
         cya: n(inputs.cyanuricAcid.value),
@@ -4434,7 +4445,7 @@
         testTime: `${inputs.reportDate.value || ''} ${inputs.testTime.value || ''}`.trim(),
         ph: n(inputs.ph.value) ?? '',
         freeChlorine: n(inputs.freeChlorine.value) ?? '',
-        totalChlorine: '',
+        totalChlorine: n(inputs.totalChlorine && inputs.totalChlorine.value) ?? '',
         alkalinity: n(inputs.alkalinity.value) ?? '',
         calciumHardness: n(inputs.calciumHardness.value) ?? '',
         cya: n(inputs.cyanuricAcid.value) ?? '',
@@ -5503,6 +5514,8 @@
       const current = {
         ph: n(inputs.ph.value),
         fc: n(inputs.freeChlorine.value),
+        tc: n(inputs.totalChlorine && inputs.totalChlorine.value),
+        cc: n(inputs.combinedChlorine && inputs.combinedChlorine.value),
         alk: n(inputs.alkalinity.value),
         calcium: n(inputs.calciumHardness.value),
         cya: n(inputs.cyanuricAcid.value),
@@ -5580,9 +5593,31 @@
             targetDecimals: 2,
             chemicalLabel: 'liquid chlorine 12.5%',
             increaseVerb: 'raise free chlorine',
-            noDoseText: 'No chlorine increase needed.',
-            highText: ranges.fc ? `Above normal range ${ranges.fc.label}. No chlorine increase needed right now.` : 'No chlorine increase needed.'
+            noDoseText: 'No chlorine increase needed. Dosing is based on free chlorine only.',
+            highText: ranges.fc ? `Above normal range ${ranges.fc.label}. No chlorine increase needed right now. Dosing is based on free chlorine only.` : 'No chlorine increase needed. Dosing is based on free chlorine only.'
           })
+        },
+        {
+          key: 'totalChlorine',
+          parameter: 'Total chlorine',
+          current: current.tc,
+          target: null,
+          range: null,
+          rangeLabel: '-',
+          decimals: 2,
+          status: getRecordedOnlyStatus(current.tc),
+          action: current.tc == null ? 'Enter the total chlorine reading for reference. Chlorine dosing still uses free chlorine only.' : 'Reference only - chlorine dosing uses free chlorine only.'
+        },
+        {
+          key: 'combinedChlorine',
+          parameter: 'Combined chlorine',
+          current: current.cc,
+          target: null,
+          range: null,
+          rangeLabel: '-',
+          decimals: 2,
+          status: getRecordedOnlyStatus(current.cc),
+          action: current.cc == null ? 'Enter combined chlorine or let the app calculate total minus free. Chlorine dosing still uses free chlorine only.' : 'Reference only - investigate if elevated. Chlorine dosing uses free chlorine only.'
         },
         {
           key: 'bicarb',
@@ -6103,6 +6138,17 @@
       return `${prefix}.`;
     }
 
+    function syncCombinedChlorine() {
+      if (!inputs.combinedChlorine) return;
+      const fc = n(inputs.freeChlorine && inputs.freeChlorine.value);
+      const tc = n(inputs.totalChlorine && inputs.totalChlorine.value);
+      const cc = n(inputs.combinedChlorine.value);
+      if (tc != null && fc != null) {
+        inputs.combinedChlorine.value = formatNumber(Math.max(0, tc - fc), 2);
+      } else if (cc == null && inputs.combinedChlorine.value) {
+        inputs.combinedChlorine.value = '';
+      }
+    }
     function getSpinTouchRowsFromInputs() {
       return SPIN_TOUCH_SCREEN_ORDER.map(item => ({
         label: item.label,
@@ -6125,13 +6171,17 @@
         bicarb: rows.find(row => row.parameter === 'Alkalinity'),
         calcium: rows.find(row => row.parameter === 'Calcium hardness'),
         stabiliser: rows.find(row => row.parameter === 'CYA'),
-        salt: rows.find(row => row.parameter === 'Salt')
+        salt: rows.find(row => row.parameter === 'Salt'),
+        totalChlorine: rows.find(row => row.parameter === 'Total chlorine'),
+        combinedChlorine: rows.find(row => row.parameter === 'Combined chlorine')
       };
 
       const summaryItems = [
         { label: 'Water Clarity', value: inputs.waterClarity.value || '-' },
         { label: 'Volume (L)', value: formatNumber(volume, 0) },
         { label: 'Free Chlorine', value: rowsMap.chlorine && rowsMap.chlorine.current != null ? formatNumber(rowsMap.chlorine.current, 2) : '-' },
+        { label: 'Total Chlorine', value: rowsMap.totalChlorine && rowsMap.totalChlorine.current != null ? formatNumber(rowsMap.totalChlorine.current, 2) : '-' },
+        { label: 'Combined Chlorine', value: rowsMap.combinedChlorine && rowsMap.combinedChlorine.current != null ? formatNumber(rowsMap.combinedChlorine.current, 2) : '-' },
         { label: 'pH', value: rowsMap.acid && rowsMap.acid.current != null ? formatNumber(rowsMap.acid.current, 2) : '-' },
         { label: 'Alkalinity', value: rowsMap.bicarb && rowsMap.bicarb.current != null ? formatNumber(rowsMap.bicarb.current, 0) : '-' },
         { label: 'Calcium', value: rowsMap.calcium && rowsMap.calcium.current != null ? formatNumber(rowsMap.calcium.current, 0) : '-' },
@@ -6960,11 +7010,13 @@ async function savePdfReport() {
 
     const OCR_LABELS = {
       freeChlorine: ['free chlorine', 'free cl', 'free ci', 'chlorine free', 'chlorine', 'fcl', 'f c l', 'fc', 'f c', 'fci', 'fel', 'fol', 'fck'],
+      totalChlorine: ['total chlorine', 'total cl', 'total ci', 'chlorine total', 'tcl', 't c l', 'tc', 't c', 'tci'],
+      combinedChlorine: ['combined chlorine', 'combined cl', 'combined ci', 'chlorine combined', 'ccl', 'c c l', 'cc', 'c c', 'cci'],
       ph: ['p h', 'p.h', 'ph', 'ph.'],
-      alkalinity: ['total alkalinity', 'total alk', 'tot alk', 'tot. alk', 't alk', 't. alk', 'alkalinity', 'alk', 'alk.', 'aik', 'al k', 'ta'],
+      alkalinity: ['total alkalinity', 'total alk', 'tot alk', 'tot. alk', 't alk', 't. alk', 'alkalinity', 'alk', 'alk.', 'alky', 'alx', 'aik', 'al k', 'ta', 't a'],
       calciumHardness: ['calcium hardness', 'cal hardness', 'calc hardness', 'total hardness', 'hardness', 'hard', 'hard.', 'ch', 'c h', 'ca hardness'],
       cyanuricAcid: ['cyanuric acid', 'cyanuric', 'cy acid', 'cya', 'c y a', 'cva', 'stabiliser', 'stabilizer'],
-      salt: ['salt', 'salinity', 'sodium chloride', 'nacl'],
+      salt: ['salt', 'salinity', 'sodium chloride', 'nacl', 'na cl', 'sal', 'slt', 'salt ppm'],
       temperature: ['temperature', 'water temperature', 'water temp', 'temp'],
       copper: ['copper', 'cu', 'cu.'],
       phosphates: ['phosphates', 'phosphate', 'ortho phosphate', 'orthophosphate', 'phos', 'pho', 'po4']
@@ -6972,6 +7024,8 @@ async function savePdfReport() {
 
     const SPIN_TOUCH_SCREEN_ORDER = [
       { key: 'freeChlorine', label: 'Free Chlorine', unit: 'ppm', decimals: 2, inputKey: 'freeChlorine' },
+      { key: 'totalChlorine', label: 'Total Chlorine', unit: 'ppm', decimals: 2, inputKey: 'totalChlorine' },
+      { key: 'combinedChlorine', label: 'Combined Chlorine', unit: 'ppm', decimals: 2, inputKey: 'combinedChlorine' },
       { key: 'ph', label: 'pH', unit: '', decimals: 2, inputKey: 'ph' },
       { key: 'calciumHardness', label: 'Calcium Hardness', unit: 'ppm', decimals: 0, inputKey: 'calciumHardness' },
       { key: 'alkalinity', label: 'Alkalinity', unit: 'ppm', decimals: 0, inputKey: 'alkalinity' },
@@ -7041,7 +7095,7 @@ async function savePdfReport() {
           if (value >= 50 && value <= 100) return round(value / 10, 2);
           if (value >= 500 && value <= 1000) return round(value / 100, 2);
         }
-        if (key === 'freeChlorine') {
+        if (key === 'freeChlorine' || key === 'totalChlorine' || key === 'combinedChlorine') {
           if (value >= 0 && value <= 20) return round(value, 2);
           if (value > 20 && value <= 200) return round(value / 10, 2);
           if (value > 200 && value <= 2000) return round(value / 100, 2);
@@ -7086,7 +7140,7 @@ async function savePdfReport() {
       if (key === 'ph') {
         return adjusted.find(value => value >= 5 && value <= 10) ?? adjusted[0];
       }
-      if (key === 'freeChlorine') {
+      if (key === 'freeChlorine' || key === 'totalChlorine' || key === 'combinedChlorine') {
         return adjusted.find(value => value >= 0 && value <= 20) ?? adjusted[0];
       }
       if (key === 'alkalinity') {
@@ -7171,6 +7225,38 @@ async function savePdfReport() {
       return candidates;
     }
 
+    function buildOcrTextFromWordRows(words) {
+      const usable = (words || [])
+        .map(word => {
+          const box = word.bbox || {};
+          const text = String(word.text || '').trim();
+          if (!text) return null;
+          const x0 = Number(box.x0);
+          const x1 = Number(box.x1);
+          const y0 = Number(box.y0);
+          const y1 = Number(box.y1);
+          if (![x0, x1, y0, y1].every(Number.isFinite)) return null;
+          return { text, x: (x0 + x1) / 2, y: (y0 + y1) / 2, height: Math.max(8, y1 - y0) };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.y - b.y || a.x - b.x);
+
+      const rows = [];
+      usable.forEach(word => {
+        const row = rows.find(item => Math.abs(item.y - word.y) <= Math.max(12, word.height * 0.65));
+        if (row) {
+          row.words.push(word);
+          row.y = (row.y + word.y) / 2;
+        } else {
+          rows.push({ y: word.y, words: [word] });
+        }
+      });
+
+      return rows
+        .sort((a, b) => a.y - b.y)
+        .map(row => row.words.sort((a, b) => a.x - b.x).map(word => word.text).join(' '))
+        .join('\n');
+    }
     function parseSpinTouchResults(text) {
       const results = {};
       Object.keys(OCR_LABELS).forEach(key => {
@@ -7497,6 +7583,8 @@ async function savePdfReport() {
     function applyOcrResults(results) {
       const mapping = {
         freeChlorine: 'freeChlorine',
+        totalChlorine: 'totalChlorine',
+        combinedChlorine: 'combinedChlorine',
         ph: 'ph',
         alkalinity: 'alkalinity',
         calciumHardness: 'calciumHardness',
@@ -7517,6 +7605,7 @@ async function savePdfReport() {
       });
 
       if (populated > 0) {
+        syncCombinedChlorine();
         saveState();
         renderCombinedTable();
       }
@@ -7526,6 +7615,7 @@ async function savePdfReport() {
     function applyOcrResultsToIceBath(index, results) {
       const mapping = {
         freeChlorine: `iceBath${index}Fc`,
+        totalChlorine: `iceBath${index}Tc`,
         ph: `iceBath${index}Ph`,
         alkalinity: `iceBath${index}Alk`,
         calciumHardness: `iceBath${index}Calcium`,
@@ -7594,8 +7684,9 @@ async function savePdfReport() {
             preserve_interword_spaces: '1'
           });
           const rawText = data && data.text ? data.text : '';
-          rawTexts.push(rawText);
-          const parsed = parseSpinTouchResults(rawText);
+          const rowText = buildOcrTextFromWordRows(data && data.words);
+          rawTexts.push(rawText, rowText);
+          const parsed = parseSpinTouchResults(`${rawText}\n${rowText}`);
           resultSets.push(parsed);
         }
 
@@ -7769,7 +7860,7 @@ async function savePdfReport() {
       clearJobPhotoAttachments();
       [1, 2, 3].forEach(index => clearIceBathPhoto(index));
       qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
-      setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills results in Spin Touch order.');
+      setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills FC, TC, CC, pH, calcium, alk, CYA, copper, salt, phosphates and temperature in Spin Touch order.');
       setDefaultDateTime();
       loadPoolDefaults();
       renderQuickActions();
@@ -7791,6 +7882,7 @@ async function savePdfReport() {
       if (document.activeElement === inputs.reportSite) inputs.reportSite.dataset.auto = 'false';
       if (document.activeElement === inputs.reportPoolName) inputs.reportPoolName.dataset.auto = 'false';
       updateActiveVolume();
+      syncCombinedChlorine();
       saveState();
       renderCombinedTable();
       renderStockSection();
@@ -7822,7 +7914,7 @@ async function savePdfReport() {
       [
         'reportSite', 'reportPoolName', 'reportTechnician', 'reportDate', 'testTime', 'waterClarity',
         'serviceNotes', 'poolSelect', 'poolVolumeAuto', 'customVolume', 'activeVolume',
-        'ph', 'targetPh', 'freeChlorine', 'targetFreeChlorine', 'alkalinity', 'targetAlkalinity',
+        'ph', 'targetPh', 'freeChlorine', 'targetFreeChlorine', 'totalChlorine', 'combinedChlorine', 'alkalinity', 'targetAlkalinity',
         'calciumHardness', 'targetCalcium', 'cyanuricAcid', 'targetCya', 'salt', 'targetSalt',
         'temperature', 'copper', 'phosphates',
         'visitFrequencyDays', 'siteMemoryText', 'contextExtraNote',
@@ -7882,7 +7974,7 @@ async function savePdfReport() {
         qs('photoInput').value = '';
         qs('photoInputCamera').value = '';
         qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
-        setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills results in Spin Touch order.');
+        setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills FC, TC, CC, pH, calcium, alk, CYA, copper, salt, phosphates and temperature in Spin Touch order.');
       });
       [1, 2, 3].forEach(index => {
         const photoInput = qs(`iceBath${index}PhotoInput`);
