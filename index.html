@@ -2283,7 +2283,7 @@
 
       <section class="card span-12" id="stockLogCard">
         <h2>Chemical stock used</h2>
-        <div class="mode-note">This tracks stock used on this device/browser only. It does not manage inventory levels.</div>
+        <div class="mode-note">Marked Dosed = Yes chemicals are automatically logged to stock used when you generate or save the service report.</div>
         <div id="stockContent"></div>
       </section>
 
@@ -2299,6 +2299,7 @@
           <button class="button" id="generateReportBtn" type="button">Generate report</button>
           <!-- Updated: the save and generate button now also records a visit snapshot automatically -->
           <button class="button secondary" id="saveReportBtn" type="button">Save report (PDF + snapshot)</button>
+          <button class="button ghost" id="generateMainCostReportBtn" type="button">Generate cost report PDF</button>
 
           <!-- Removed: separate save snapshot button is redundant because the PDF save now records a snapshot -->
           <!-- <button class="button ghost" id="saveVisitSnapshotBtn" type="button">Save visit snapshot</button> -->
@@ -2641,9 +2642,12 @@
     const SHEET_STATUS_STORAGE_KEY = 'mbs-sheet-status-v1';
     const COST_SYNC_DEVICE_KEY = 'mbs-cost-sync-device-id-v1';
     const COST_SYNC_LAST_PULL_KEY = 'mbs-cost-sync-last-pull-v1';
+    const COST_SYNC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     const DEFAULT_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxim0-6TTC5IBLXUAG7vYDE8wf_criRVROl5uuDmAdWfe3rkWh-3wHitmbYEUjtjFkR/exec';
     let activeScreen = 'pools';
     let activeHistoryTrendMetric = 'ph';
+    let costSyncRefreshTimer = null;
+    let costSyncRefreshInFlight = false;
 
     const HISTORY_TREND_METRICS = [
       { key: 'ph', label: 'pH', decimals: 2, unit: '', accessor: item => item.ph, range: pool => [round((pool.defaults?.ph || 7.2) - 0.3, 2), round((pool.defaults?.ph || 7.2) + 0.3, 2)], ideal: pool => pool.defaults?.ph || 7.2 },
@@ -2837,20 +2841,48 @@
       });
     }
 
+    function getChemicalQuantityDisplay(value, unit) {
+      if (!Number.isFinite(value) || value <= 0) return null;
+      const rawUnit = unit || '';
+      if (rawUnit === 'mL') {
+        if (value >= 1000) return { value: Math.max(1, Math.round(value / 1000)), unit: 'L' };
+        return { value: Math.max(1, Math.round(value)), unit: 'mL' };
+      }
+      if (rawUnit === 'L') {
+        if (value > 0 && value < 1) return { value: Math.max(1, Math.round(value * 1000)), unit: 'mL' };
+        return { value: Math.max(1, Math.round(value)), unit: 'L' };
+      }
+      if (rawUnit === 'kg') {
+        if (value > 0 && value < 1) return { value: Math.max(1, Math.round(value * 1000)), unit: 'g' };
+        return { value: Math.max(1, Math.round(value)), unit: 'kg' };
+      }
+      if (rawUnit === 'g') return { value: Math.max(1, Math.round(value)), unit: 'g' };
+      return { value: Math.max(1, Math.round(value)), unit: rawUnit };
+    }
+
+    function formatChemicalQuantity(value, unit) {
+      const display = getChemicalQuantityDisplay(value, unit);
+      return display ? `${formatNumber(display.value, 0)} ${display.unit}`.trim() : 'No dose';
+    }
+
     function formatDose(value, unit, decimals = 0) {
-      if (!Number.isFinite(value) || value <= 0) return 'No dose';
-      return `${formatNumber(value, decimals)} ${unit}`;
+      return formatChemicalQuantity(value, unit);
     }
 
     function roundDoseUp(value) {
       if (!Number.isFinite(value) || value <= 0) return 0;
-      return Math.ceil(value - 1e-9);
+      return Math.round(value);
     }
 
     function formatRecommendedDose(value, unit) {
-      const roundedValue = roundDoseUp(value);
-      if (!roundedValue) return 'No dose';
-      return `${formatNumber(roundedValue, 0)} ${unit}`;
+      return formatChemicalQuantity(value, unit);
+    }
+
+    function formatLoggedQuantity(tx) {
+      const qty = Number(tx && tx.qty);
+      const unit = tx && tx.unit ? tx.unit : (chemicalMeta[tx && tx.chemical] && chemicalMeta[tx.chemical].unit) || '';
+      if (Number.isFinite(qty) && qty > 0 && unit) return formatChemicalQuantity(qty, unit);
+      return tx && tx.qtyText ? tx.qtyText : '-';
     }
 
     function getDoseSourceLabel(source, mode = 'short') {
@@ -3263,7 +3295,7 @@
           ...item,
           dosed: snapshot.status === 'yes' ? 'Yes' : 'No',
           source: getDoseSourceLabel(snapshot.source),
-          actualQtyText: Number.isFinite(actualQty) && actualQty > 0 ? `${formatNumber(actualQty, item.decimals)} ${item.unit}` : '',
+          actualQtyText: Number.isFinite(actualQty) && actualQty > 0 ? formatChemicalQuantity(actualQty, item.unit) : '',
           notes: snapshot.note || ''
         };
       });
@@ -4508,9 +4540,10 @@
       }
     }
 
-    function refreshCostDataFromGoogleSheetQuietly() {
+    async function refreshCostDataFromGoogleSheetQuietly(delayMs = 900) {
       const url = getGoogleScriptUrl();
-      if (!url) return;
+      if (!url || costSyncRefreshInFlight) return;
+      costSyncRefreshInFlight = true;
       setTimeout(async () => {
         try {
           const response = await requestGoogleJsonp('costSnapshot');
@@ -4520,8 +4553,20 @@
           }
         } catch (error) {
           console.info('Cost sync auto-refresh skipped', error);
+        } finally {
+          costSyncRefreshInFlight = false;
         }
-      }, 900);
+      }, delayMs);
+    }
+
+    function startCostSyncAutoRefresh() {
+      refreshCostDataFromGoogleSheetQuietly(900);
+      if (costSyncRefreshTimer) clearInterval(costSyncRefreshTimer);
+      costSyncRefreshTimer = setInterval(() => refreshCostDataFromGoogleSheetQuietly(0), COST_SYNC_REFRESH_INTERVAL_MS);
+      window.addEventListener('focus', () => refreshCostDataFromGoogleSheetQuietly(0));
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshCostDataFromGoogleSheetQuietly(0);
+      });
     }
     async function updateLiveMasterSheetBatch(payloads) {
       if (!Array.isArray(payloads) || !payloads.length) {
@@ -5073,14 +5118,13 @@
           <td>${escapeHtml(tx.date || '-')}</td>
           <td>${escapeHtml(tx.chemicalLabel || '-')}</td>
           <td>${escapeHtml(tx.sourceLabel || '-')}</td>
-          <td>${escapeHtml(tx.qtyText || '-')}</td>
+          <td>${escapeHtml(formatLoggedQuantity(tx))}</td>
           <td>${escapeHtml(tx.note || '')}</td>
         </tr>
       `).join('') : '<tr><td colspan="5">No stock used logged yet for this pool.</td></tr>';
       wrap.innerHTML = `
         <div class="stock-grid">
           <div class="actions">
-            <button class="button" id="recordDoseStockBtn" type="button">Record marked doses to stock used log</button>
             <button class="button ghost" id="clearStockUsedBtn" type="button">Clear this pool log</button>
           </div>
           <div class="metric-band">
@@ -5153,7 +5197,6 @@
           </div>
         </div>
       `;
-      qs('recordDoseStockBtn').addEventListener('click', recordMarkedDosesToStockLog);
       qs('clearStockUsedBtn').addEventListener('click', clearCurrentPoolStockUsedLog);
       qs('addExtraStockBtn').addEventListener('click', addExtraStockUsedEntry);
       qs('prefillChlorineTopUpBtn').addEventListener('click', () => prefillExtraStockUsedEntry({
@@ -5223,6 +5266,8 @@
     }
 
     function readCostCentreForm() {
+      const hasCostForm = !!qs('costCentreCode') || DOSE_KEYS.some(key => !!qs(`costRate_${key}`));
+      if (!hasCostForm) return getCurrentPoolCostSettings();
       const rates = {};
       DOSE_KEYS.forEach(key => {
         const value = n(qs(`costRate_${key}`)?.value);
@@ -5305,7 +5350,7 @@
           date: tx.date || '',
           chemical: tx.chemicalLabel || chemicalNames[tx.chemical] || tx.chemical || '',
           source: tx.sourceLabel || '',
-          used: tx.qtyText || `${formatNumber(tx.qty || 0, 2)} ${tx.unit || ''}`.trim(),
+          used: formatLoggedQuantity(tx),
           costQty: `${formatNumber(priced.costQty.qty, 2)} ${priced.costQty.unit}`.trim(),
           rateText: Number.isFinite(priced.rate) ? `$${formatNumber(priced.rate, 2)}/${priced.costQty.unit || 'unit'}` : 'Rate not set',
           lineTotal: priced.lineTotal,
@@ -5414,7 +5459,7 @@
       qs('saveCostSettingsBtn')?.addEventListener('click', saveCurrentCostSettings);
       qs('backupCostDataBtn')?.addEventListener('click', backupCostDataToGoogleSheet);
       qs('refreshCostDataBtn')?.addEventListener('click', refreshCostDataFromGoogleSheet);
-      qs('generateCostReportBtn')?.addEventListener('click', generateCostCentreReportPdf);
+      qs('generateCostReportBtn')?.addEventListener('click', generateStandaloneCostReportPdf);
       ['costCentreCode', 'costReportSupervisor', 'costReportJobRef', 'costReportNotes', ...DOSE_KEYS.map(key => `costRate_${key}`)].forEach(id => {
         qs(id)?.addEventListener('input', renderCostReportPreview);
       });
@@ -5481,6 +5526,13 @@
       await sendCostSyncEvent('cost_report_generated', { report: model, projection: buildCostProjectionModel() }, { toast: false });
       showAppToast('Cost centre report generated.');
     }
+
+    async function generateStandaloneCostReportPdf() {
+      if (!isRaidersGroupMode()) {
+        recordMarkedDosesToStockLog({ silent: true });
+      }
+      await generateCostCentreReportPdf();
+    }
     function clearCurrentPoolStockUsedLog() {
       const pool = getSelectedPool();
       const state = loadStockState();
@@ -5494,11 +5546,25 @@
       return;
     }
 
-    function recordMarkedDosesToStockLog() {
-      if (isRaidersGroupMode()) return;
+    function buildMarkedDoseStockSignature(pool, key, qty, snapshot) {
+      return [
+        pool.key || '',
+        inputs.reportDate?.value || '',
+        inputs.testTime?.value || '',
+        key,
+        formatNumber(qty, chemicalMeta[key].decimals),
+        snapshot.source || '',
+        snapshot.note || ''
+      ].join('|');
+    }
+
+    function recordMarkedDosesToStockLog(options = {}) {
+      if (isRaidersGroupMode()) return 0;
       const pool = getSelectedPool();
       const { doses } = buildRecommendationRows();
       const state = loadStockState();
+      state.transactions = state.transactions || [];
+      const existingSignatures = new Set(state.transactions.map(tx => tx.autoDoseSignature).filter(Boolean));
       const newTransactions = [];
       let recorded = 0;
       DOSE_KEYS.forEach(key => {
@@ -5507,9 +5573,13 @@
         const recommended = doses[key] || 0;
         const qty = snapshot.actualQty != null && snapshot.actualQty > 0 ? snapshot.actualQty : recommended;
         if (!(Number.isFinite(qty) && qty > 0)) return;
+        const autoDoseSignature = buildMarkedDoseStockSignature(pool, key, qty, snapshot);
+        if (existingSignatures.has(autoDoseSignature)) return;
+        existingSignatures.add(autoDoseSignature);
         const now = new Date();
         const transaction = {
           id: createCostRecordId(pool.key),
+          autoDoseSignature,
           ts: now.toISOString(),
           date: `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
           poolKey: pool.key,
@@ -5519,17 +5589,21 @@
           source: snapshot.source,
           sourceLabel: getDoseSourceLabel(snapshot.source, 'used') || 'Source not set',
           qty,
-          qtyText: `${formatNumber(qty, chemicalMeta[key].decimals)} ${chemicalMeta[key].unit}`,
-          note: snapshot.note || ''
+          qtyText: formatChemicalQuantity(qty, chemicalMeta[key].unit),
+          note: snapshot.note || '',
+          isAutoReportStock: true
         };
         state.transactions.push(transaction);
         newTransactions.push(transaction);
         recorded += 1;
       });
-      saveStockState(state);
-      renderStockSection();
-      if (recorded) sendCostSyncEvent('stock_used_added', { pool: getPoolSyncDetails(pool), transactions: newTransactions }, { toast: false });
-      if (!recorded) alert('No marked doses were found to record. Mark Dosed = Yes on at least one chemical first.');
+      if (recorded) {
+        saveStockState(state);
+        renderStockSection();
+        sendCostSyncEvent('stock_used_added', { pool: getPoolSyncDetails(pool), transactions: newTransactions }, { toast: false });
+      }
+      if (!recorded && !options.silent) alert('No new marked doses were found to record. Mark Dosed = Yes on at least one chemical first.');
+      return recorded;
     }
 
 
@@ -5597,7 +5671,7 @@
         unit,
         unitRate: Number.isFinite(unitRate) && unitRate >= 0 ? unitRate : null,
         costUnit: unit,
-        qtyText: `${formatNumber(qty, decimals)} ${unit}`,
+        qtyText: formatChemicalQuantity(qty, unit),
         note,
         isManualExtra: true
       };
@@ -6489,8 +6563,8 @@
         return {
           name: item.label,
           displayName: item.label,
-          qty: Number.isFinite(item.value) && item.value > 0 ? formatNumber(roundDoseUp(item.value), 0) : '',
-          unit: item.unit,
+          qty: getChemicalQuantityDisplay(item.value, item.unit)?.value != null ? formatNumber(getChemicalQuantityDisplay(item.value, item.unit).value, 0) : '',
+          unit: getChemicalQuantityDisplay(item.value, item.unit)?.unit || item.unit,
           reason,
           dosed: snapshot.status === 'yes' ? 'Yes' : 'No',
           notes: snapshot.note || getDefaultDoseNote(item.key, item.value),
@@ -6839,6 +6913,7 @@ function buildReportHtml() {
     }
 
     function renderReport() {
+      if (!isRaidersGroupMode()) recordMarkedDosesToStockLog({ silent: true });
       qs('reportOutput').innerHTML = isRaidersGroupMode() ? buildRaidersGroupReportHtml() : buildReportHtml();
       qs('kpiReport').textContent = 'Ready';
     }
@@ -8303,7 +8378,7 @@ async function savePdfReport() {
       renderQrSection();
       renderPriorityAlerts();
       restoreSheetStatus();
-      refreshCostDataFromGoogleSheetQuietly();
+      startCostSyncAutoRefresh();
       initTabs();
       renderDraftStatus();
       renderJobPhotoPreview();
@@ -8347,6 +8422,7 @@ async function savePdfReport() {
       });
       qs('generateReportBtn').addEventListener('click', renderReport);
       qs('saveReportBtn').addEventListener('click', savePdfReport);
+      qs('generateMainCostReportBtn')?.addEventListener('click', generateStandaloneCostReportPdf);
       qs('generateClosedReportBtn').addEventListener('click', renderClosedLoopReport);
       qs('saveClosedReportBtn').addEventListener('click', saveClosedLoopPdfReport);
       // Removed: separate snapshot buttons are no longer used because the report save functions automatically record snapshots.
