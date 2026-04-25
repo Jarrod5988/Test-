@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -1338,6 +1338,41 @@
       color: #17324d;
     }
 
+    .insight-item.good {
+      border-color: rgba(21, 148, 94, 0.24);
+      background: linear-gradient(180deg, rgba(246,255,250,0.98) 0%, rgba(235,250,242,0.94) 100%);
+      color: #115c3c;
+    }
+
+    .insight-item.warn {
+      border-color: rgba(184, 117, 13, 0.28);
+      background: linear-gradient(180deg, rgba(255,251,242,0.98) 0%, rgba(255,244,222,0.94) 100%);
+      color: #7a4a05;
+    }
+
+    .insight-item.bad {
+      border-color: rgba(201, 75, 75, 0.30);
+      background: linear-gradient(180deg, rgba(255,247,247,0.98) 0%, rgba(255,235,235,0.94) 100%);
+      color: #8b2f2f;
+    }
+
+    .insight-item.info {
+      border-color: rgba(0, 120, 180, 0.22);
+      background: linear-gradient(180deg, rgba(247,253,255,0.98) 0%, rgba(235,248,255,0.94) 100%);
+      color: #174f7c;
+    }
+
+    .priority-alert-card {
+      align-self: start;
+      border-color: rgba(184, 117, 13, 0.28);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,250,239,0.94) 100%);
+    }
+
+    .priority-alert-card.is-clear {
+      border-color: rgba(21, 148, 94, 0.22);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(244,253,248,0.94) 100%);
+    }
+
     .memory-box {
       min-height: 170px;
       font-size: 14px;
@@ -1807,7 +1842,7 @@
 
       .app-tabs {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         overflow: visible;
         gap: 8px;
       }
@@ -1894,7 +1929,6 @@
       <button class="tab-btn" type="button" data-screen="pools">Pool testing</button>
       <button class="tab-btn" type="button" data-screen="closedLoops">Closed loops</button>
       <button class="tab-btn" type="button" data-screen="insights">Insights & assets</button>
-      <button class="tab-btn" type="button" data-screen="admin">QR & setup</button>
     </div>
 
     <div id="screenPools" class="screen-panel active">
@@ -1927,6 +1961,11 @@
         <!-- Note displayed for pools using special systems like Enviroswim -->
         <small id="poolSystemNote" style="display:none; margin-top: 8px; color: var(--muted); font-size: 12px;"></small>
         <div id="poolVolumeHelperNote" class="pool-helper-note"></div>
+      </section>
+      <section class="card span-8 priority-alert-card" id="priorityAlertsCard">
+        <h2>Today's priority alerts</h2>
+        <div id="priorityAlertsSummary" class="insight-list"></div>
+        <div class="inline-note">Only urgent chemistry and water-quality risks appear here. Full reasoning stays in Insights.</div>
       </section>
       <section class="card span-12">
         <h2>Quick capture</h2>
@@ -2395,6 +2434,11 @@
             <div id="usageSummary" class="insight-list"></div>
           </div>
           <div class="subcard">
+            <h3>Operational risk assistant</h3>
+            <div id="operationalRiskSummary" class="insight-list"></div>
+            <div class="inline-note">Based on current readings and public pool guidance. Always follow site procedure, product labels and local rules.</div>
+          </div>
+          <div class="subcard">
             <h3>Blame shield / service context</h3>
             <div class="check-grid">
               <label class="check-pill"><input id="ctxOwnerChemicals" type="checkbox" /> Owner added chemicals</label>
@@ -2547,6 +2591,7 @@
     const REPORT_BLUE_ACCENT = '#0059AD';
     const STORAGE_KEY = 'mbs-pool-dosing-combined-v3';
     const STOCK_STORAGE_KEY = 'mbs-pool-stock-v1';
+    const COST_CENTRE_STORAGE_KEY = 'mbs-cost-centre-settings-v1';
     const DOSE_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium', 'stabiliser', 'salt'];
     const GROUP_ICE_DOSING_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium'];
     const WATCH_ITEMS_STORAGE_KEY = 'mbs-watch-items-v1';
@@ -2703,12 +2748,12 @@
     };
 
     const chemicalMeta = {
-      acid: { unit: 'mL', decimals: 0 },
-      chlorine: { unit: 'mL', decimals: 0 },
-      bicarb: { unit: 'kg', decimals: 2 },
-      calcium: { unit: 'kg', decimals: 2 },
-      stabiliser: { unit: 'kg', decimals: 2 },
-      salt: { unit: 'kg', decimals: 2 }
+      acid: { unit: 'mL', decimals: 0, costUnit: 'L', rateLabel: '$/L' },
+      chlorine: { unit: 'mL', decimals: 0, costUnit: 'L', rateLabel: '$/L' },
+      bicarb: { unit: 'kg', decimals: 2, costUnit: 'kg', rateLabel: '$/kg' },
+      calcium: { unit: 'kg', decimals: 2, costUnit: 'kg', rateLabel: '$/kg' },
+      stabiliser: { unit: 'kg', decimals: 2, costUnit: 'kg', rateLabel: '$/kg' },
+      salt: { unit: 'kg', decimals: 2, costUnit: 'kg', rateLabel: '$/kg' }
     };
 
     const inputs = {};
@@ -3541,10 +3586,90 @@
       ].filter(Boolean);
     }
 
+    function buildOperationalRiskSummary() {
+      const pool = getSelectedPool();
+      const ph = n(inputs.ph && inputs.ph.value);
+      const fc = n(inputs.freeChlorine && inputs.freeChlorine.value);
+      const cya = n(inputs.cyanuricAcid && inputs.cyanuricAcid.value);
+      const alk = n(inputs.alkalinity && inputs.alkalinity.value);
+      const calcium = n(inputs.calciumHardness && inputs.calciumHardness.value);
+      const copper = n(inputs.copper && inputs.copper.value);
+      const clarity = inputs.waterClarity && inputs.waterClarity.value;
+      const name = `${pool.site || ''} ${pool.poolName || ''}`.toLowerCase();
+      const isSpaLike = name.includes('spa') || name.includes('hot tub') || name.includes('hydrotherapy');
+      const likelyOutdoor = !name.includes('indoor');
+      const alerts = [];
+      const add = (tone, message) => alerts.push({ tone, message });
+
+      if (fc == null) {
+        add('info', 'Add free chlorine to assess sanitiser risk. This is the highest-value reading for the next-service decision.');
+      } else if (fc < 1) {
+        add('bad', 'Free chlorine is below 1 ppm. Treat as a high-priority sanitiser risk before the pool is used.');
+      } else if (cya != null && cya > 0 && fc < 3) {
+        add('bad', 'Stabiliser/CYA is present and free chlorine is below 3 ppm. NSW guidance expects higher free chlorine when cyanurate is used.');
+      } else if (cya != null && cya > 0 && fc < 2) {
+        add('warn', 'CYA is present and free chlorine is below the CDC stabilised-pool minimum of 2 ppm.');
+      } else {
+        add('good', 'Free chlorine is not showing an immediate low-sanitiser flag from the current reading.');
+      }
+
+      if (ph == null) {
+        add('info', 'Add pH to assess disinfection efficiency, corrosion and swimmer comfort.');
+      } else if (ph > 7.8) {
+        add('bad', 'pH is above 7.8. Chlorine becomes less effective as pH rises, so correct pH before relying on the chlorine reading.');
+      } else if (ph < 7.0) {
+        add('bad', 'pH is below 7.0. That increases corrosion risk for pipework, heaters and metal components.');
+      } else if (ph >= 7.6) {
+        add('warn', 'pH is near the upper end of the useful range. Watch chlorine performance and scale tendency.');
+      } else {
+        add('good', 'pH is inside the common 7.0-7.8 operating band.');
+      }
+
+      if (cya != null) {
+        if (isSpaLike && cya > 0) add('bad', 'Cyanuric acid/stabiliser is recorded for a spa-like system. NSW and CDC guidance says not to use CYA in spas/hot tubs.');
+        else if (cya > 50) add('bad', 'Cyanuric acid is above 50 mg/L. NSW guidance sets 50 mg/L as the upper limit because high CYA can slow disinfection.');
+        else if (cya >= 45) add('warn', 'Cyanuric acid is close to the 50 mg/L ceiling. Avoid stabilised chlorine until it drifts down.');
+        else if (cya > 0 && !likelyOutdoor) add('warn', 'CYA is recorded on a pool that may be indoor/enclosed. Stabiliser is normally for outdoor chlorine pools exposed to UV.');
+      }
+
+      if (clarity && /cloudy|poor/i.test(clarity)) {
+        add('warn', `Water clarity is marked "${clarity}". Check filtration/turnover, combined chlorine risk, and whether the pool should stay out of service until clear.`);
+      }
+
+      if (alk != null && alk < 60) add('warn', 'Alkalinity is low. Expect pH bounce and higher corrosion sensitivity.');
+      if (alk != null && alk > 180) add('warn', 'Alkalinity is high. Expect acid demand and possible scale/cloudiness issues.');
+      if (calcium != null && calcium < 100) add('warn', 'Calcium hardness is low. Watch etching/corrosive-water risk in plaster and metal systems.');
+      if (calcium != null && calcium > 400) add('warn', 'Calcium hardness is high. Watch scale risk, especially if pH or alkalinity is also high.');
+      if (copper != null && copper >= 0.3) add('warn', 'Copper is elevated enough to watch staining and hair/fixture discolouration risk.');
+
+      if (!alerts.length) add('info', 'Enter today\'s chemistry readings on Pool testing to generate operational risk prompts here.');
+      return alerts;
+    }
+
     function renderInsightList(targetId, messages) {
       const wrap = qs(targetId);
       if (!wrap) return;
       wrap.innerHTML = messages.map(message => `<div class="insight-item">${escapeHtml(message)}</div>`).join('');
+    }
+
+    function renderInsightObjects(targetId, items) {
+      const wrap = qs(targetId);
+      if (!wrap) return;
+      wrap.innerHTML = items.map(item => `<div class="insight-item ${escapeHtml(item.tone || 'info')}">${escapeHtml(item.message || '')}</div>`).join('');
+    }
+
+    function renderPriorityAlerts() {
+      const wrap = qs('priorityAlertsSummary');
+      const card = qs('priorityAlertsCard');
+      if (!wrap) return;
+      const priorityItems = buildOperationalRiskSummary().filter(item => item.tone === 'bad' || item.tone === 'warn');
+      if (!priorityItems.length) {
+        wrap.innerHTML = '<div class="insight-item good">No urgent chemistry alerts from the current readings.</div>';
+        if (card) card.classList.add('is-clear');
+        return;
+      }
+      if (card) card.classList.remove('is-clear');
+      wrap.innerHTML = priorityItems.map(item => `<div class="insight-item ${escapeHtml(item.tone)}">${escapeHtml(item.message || '')}</div>`).join('');
     }
 
     async function renderAssetQrCards(poolKey) {
@@ -3847,6 +3972,8 @@
       const forecast = buildForecastSummary();
       renderInsightList('forecastSummary', forecast.messages);
       renderInsightList('usageSummary', buildUsageSummary());
+      renderInsightObjects('operationalRiskSummary', buildOperationalRiskSummary());
+      renderPriorityAlerts();
       renderHistorySection();
       renderAssetSection();
       renderWatchItems();
@@ -4777,8 +4904,31 @@
             ${summary || '<div class="metric-chip">No stock used recorded yet</div>'}
           </div>
           <div class="subcard" style="margin-bottom: 12px;">
+            <h3 style="margin-bottom: 10px;">Cost centre report</h3>
+            <div class="mode-note" style="margin-bottom: 10px;">Uses the saved chemical stock-used log for this selected pool. Add rates to calculate costs for the supervisor report.</div>
+            <div class="asset-form-grid">
+              <div class="field"><label for="costCentreCode">Cost centre / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" /></div>
+              <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" /></div>
+              <div class="field"><label for="costReportJobRef">Job reference</label><input id="costReportJobRef" type="text" placeholder="Optional work order" /></div>
+              <div class="field"><label for="costReportNotes">Cost notes</label><input id="costReportNotes" type="text" placeholder="Optional note for supervisor" /></div>
+            </div>
+            <div class="field-grid" style="margin: 12px 0;">
+              ${DOSE_KEYS.map(key => `
+                <div class="field">
+                  <label for="costRate_${key}">${escapeHtml(chemicalNames[key])} ${escapeHtml(chemicalMeta[key].rateLabel || '$/unit')}</label>
+                  <input id="costRate_${key}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                </div>
+              `).join('')}
+            </div>
+            <div class="actions" style="margin-bottom: 12px;">
+              <button class="button secondary" id="saveCostSettingsBtn" type="button">Save cost settings</button>
+              <button class="button" id="generateCostReportBtn" type="button">Generate cost report PDF</button>
+            </div>
+            <div id="costReportPreview" class="summary"></div>
+          </div>
+          <div class="subcard" style="margin-bottom: 12px;">
             <h3 style="margin-bottom: 10px;">Additional bulk chemicals used</h3>
-            <div class="mode-note" style="margin-bottom: 10px;">Preset 15 L drum top-up options are included for automatic dosing drums.</div>
+            <div class="mode-note" style="margin-bottom: 10px;">Preset 15 L drum top-up options are included for automatic dosing drums. Add unit cost when you need to price a chemical on the move.</div>
             <div class="actions" style="margin-bottom: 12px;">
               <button class="button ghost" id="prefillChlorineTopUpBtn" type="button">15 L liquid chlorine drum top-up</button>
               <button class="button ghost" id="prefillAcidTopUpBtn" type="button">15 L hydrochloric acid drum top-up</button>
@@ -4814,6 +4964,10 @@
                 </select>
               </div>
               <div class="field">
+                <label for="extraStockUnitCost">Unit cost (optional)</label>
+                <input id="extraStockUnitCost" type="number" min="0" step="0.01" inputmode="decimal" placeholder="$/unit" />
+              </div>
+              <div class="field">
                 <label for="extraStockNote">Note</label>
                 <input id="extraStockNote" type="text" placeholder="Optional note" />
               </div>
@@ -4840,6 +4994,7 @@
       `;
       qs('recordDoseStockBtn').addEventListener('click', recordMarkedDosesToStockLog);
       qs('clearStockUsedBtn').addEventListener('click', clearCurrentPoolStockUsedLog);
+      bindCostCentreControls();
       qs('addExtraStockBtn').addEventListener('click', addExtraStockUsedEntry);
       qs('prefillChlorineTopUpBtn').addEventListener('click', () => prefillExtraStockUsedEntry({
         chemicalLabel: 'Liquid Chlorine Drum Top-up',
@@ -4857,6 +5012,185 @@
       }));
     }
 
+
+    function getCostSettingsState() {
+      return loadJson(COST_CENTRE_STORAGE_KEY, {});
+    }
+
+    function saveCostSettingsState(state) {
+      saveJson(COST_CENTRE_STORAGE_KEY, state);
+    }
+
+    function getCurrentPoolCostSettings() {
+      const pool = getSelectedPool();
+      const state = getCostSettingsState();
+      return state[pool.key] || { rates: {} };
+    }
+
+    function readCostCentreForm() {
+      const rates = {};
+      DOSE_KEYS.forEach(key => {
+        const value = n(qs(`costRate_${key}`)?.value);
+        if (Number.isFinite(value) && value >= 0) rates[key] = value;
+      });
+      return {
+        costCentre: (qs('costCentreCode')?.value || '').trim(),
+        supervisor: (qs('costReportSupervisor')?.value || '').trim(),
+        jobRef: (qs('costReportJobRef')?.value || '').trim(),
+        notes: (qs('costReportNotes')?.value || '').trim(),
+        rates
+      };
+    }
+
+    function applyCostSettingsToForm() {
+      const settings = getCurrentPoolCostSettings();
+      if (qs('costCentreCode')) qs('costCentreCode').value = settings.costCentre || '';
+      if (qs('costReportSupervisor')) qs('costReportSupervisor').value = settings.supervisor || '';
+      if (qs('costReportJobRef')) qs('costReportJobRef').value = settings.jobRef || '';
+      if (qs('costReportNotes')) qs('costReportNotes').value = settings.notes || '';
+      DOSE_KEYS.forEach(key => {
+        const field = qs(`costRate_${key}`);
+        if (field) field.value = settings.rates && settings.rates[key] != null ? settings.rates[key] : '';
+      });
+    }
+
+    function saveCurrentCostSettings() {
+      const pool = getSelectedPool();
+      const state = getCostSettingsState();
+      state[pool.key] = readCostCentreForm();
+      saveCostSettingsState(state);
+      renderCostReportPreview();
+      showAppToast('Cost centre settings saved.');
+    }
+
+    function getCostRateKey(tx) {
+      if (chemicalMeta[tx.chemical]) return tx.chemical;
+      const label = `${tx.chemicalLabel || ''} ${tx.note || ''}`.toLowerCase();
+      if (label.includes('chlorine')) return 'chlorine';
+      if (label.includes('acid') || label.includes('hydrochloric')) return 'acid';
+      if (label.includes('bicarb') || label.includes('sodium bicarbonate')) return 'bicarb';
+      if (label.includes('calcium')) return 'calcium';
+      if (label.includes('stabiliser') || label.includes('cyanuric')) return 'stabiliser';
+      if (label.includes('salt')) return 'salt';
+      return '';
+    }
+
+    function getCostQuantity(tx, costKey = '') {
+      const meta = chemicalMeta[tx.chemical] || chemicalMeta[costKey];
+      const rawQty = Number(tx.qty || 0);
+      const rawUnit = tx.unit || (chemicalMeta[tx.chemical] && chemicalMeta[tx.chemical].unit) || '';
+      if (!meta) return { qty: rawQty, unit: rawUnit };
+      if (rawUnit === 'mL' || (meta.unit === 'mL' && meta.costUnit === 'L' && !rawUnit)) return { qty: rawQty / 1000, unit: 'L' };
+      if (rawUnit === 'L') return { qty: rawQty, unit: 'L' };
+      return { qty: rawQty, unit: meta.costUnit || rawUnit || meta.unit || '' };
+    }
+
+    function buildCostCentreReportModel() {
+      const pool = getSelectedPool();
+      const settings = readCostCentreForm();
+      const transactions = (loadStockState().transactions || []).filter(tx => tx.poolKey === pool.key);
+      let pricedTotal = 0;
+      const rows = transactions.map(tx => {
+        const costKey = getCostRateKey(tx);
+        const entryRate = Number(tx.unitRate);
+        const costQty = Number.isFinite(entryRate)
+          ? { qty: Number(tx.qty) || 0, unit: tx.costUnit || tx.unit || '' }
+          : getCostQuantity(tx, costKey);
+        const rate = Number.isFinite(entryRate) ? entryRate : costKey ? settings.rates[costKey] : null;
+        const lineTotal = Number.isFinite(rate) ? costQty.qty * rate : null;
+        if (Number.isFinite(lineTotal)) pricedTotal += lineTotal;
+        return {
+          date: tx.date || '',
+          chemical: tx.chemicalLabel || chemicalNames[tx.chemical] || tx.chemical || '',
+          source: tx.sourceLabel || '',
+          used: tx.qtyText || `${formatNumber(tx.qty || 0, 2)} ${tx.unit || ''}`.trim(),
+          costQty: `${formatNumber(costQty.qty, 2)} ${costQty.unit}`.trim(),
+          rateText: Number.isFinite(rate) ? `$${formatNumber(rate, 2)}/${costQty.unit || 'unit'}` : 'Rate not set',
+          lineTotal,
+          note: tx.note || ''
+        };
+      });
+      return { pool, settings, rows, pricedTotal, unpricedCount: rows.filter(row => !Number.isFinite(row.lineTotal)).length, generatedAt: new Date() };
+    }
+
+    function renderCostReportPreview() {
+      const wrap = qs('costReportPreview');
+      if (!wrap) return;
+      const model = buildCostCentreReportModel();
+      const pending = model.unpricedCount ? `${model.unpricedCount} line(s) need rates before the total is complete.` : 'All recognised chemicals are priced.';
+      wrap.innerHTML = `<strong>${escapeHtml(model.rows.length)} chemical-use line(s)</strong><br>Total priced cost: <strong>$${escapeHtml(formatNumber(model.pricedTotal, 2))}</strong><br>${escapeHtml(pending)}`;
+    }
+
+    function bindCostCentreControls() {
+      applyCostSettingsToForm();
+      renderCostReportPreview();
+      qs('saveCostSettingsBtn')?.addEventListener('click', saveCurrentCostSettings);
+      qs('generateCostReportBtn')?.addEventListener('click', generateCostCentreReportPdf);
+      ['costCentreCode', 'costReportSupervisor', 'costReportJobRef', 'costReportNotes', ...DOSE_KEYS.map(key => `costRate_${key}`)].forEach(id => {
+        qs(id)?.addEventListener('input', renderCostReportPreview);
+      });
+    }
+
+    async function generateCostCentreReportPdf() {
+      const model = buildCostCentreReportModel();
+      if (!model.rows.length) {
+        alert('No chemical stock-used entries are logged for this pool yet. Record used chemicals first.');
+        return;
+      }
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        alert('PDF tools are still loading. Try again in a moment.');
+        return;
+      }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 10;
+      const blue = [0, 58, 117];
+      const borderBlue = [168, 191, 216];
+      doc.setDrawColor(...borderBlue);
+      doc.roundedRect(6, 6, pageWidth - 12, pageHeight - 12, 4, 4, 'S');
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(margin, 10, pageWidth - (margin * 2), 38, 3, 3, 'FD');
+      try { doc.addImage(REPORT_LOGO_DATA, 'PNG', margin + 4, 14, 58, 18.65); } catch (error) {}
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...blue);
+      doc.setFontSize(15);
+      doc.text('Chemical Cost Centre Report', margin + 66, 20);
+      doc.setFontSize(9);
+      doc.text(`Site: ${model.pool.site || inputs.reportSite.value || '-'}`, margin + 66, 28);
+      doc.text(`Pool: ${model.pool.poolName || inputs.reportPoolName.value || '-'}`, margin + 66, 35);
+      doc.text(`Cost centre: ${model.settings.costCentre || '-'}`, pageWidth - 86, 20);
+      doc.text(`Supervisor: ${model.settings.supervisor || '-'}`, pageWidth - 86, 28);
+      doc.text(`Job ref: ${model.settings.jobRef || '-'}`, pageWidth - 86, 35);
+      doc.setTextColor(0, 0, 0);
+      let y = 55;
+      doc.setFillColor(...blue);
+      doc.roundedRect(margin, y, pageWidth - (margin * 2), 7.5, 2.2, 2.2, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text('Chemical use and cost allocation', margin + 3, y + 5);
+      doc.setTextColor(0, 0, 0);
+      y += 8.5;
+      const rows = model.rows.map(row => [row.date, row.chemical, row.source, row.used, row.costQty, row.rateText, Number.isFinite(row.lineTotal) ? `$${formatNumber(row.lineTotal, 2)}` : 'Pending', row.note]);
+      y = drawTable(doc, margin, y, [29, 42, 31, 24, 24, 28, 24, pageWidth - (margin * 2) - 202], ['Date / time', 'Chemical', 'Source', 'Used', 'Cost qty', 'Rate', 'Line total', 'Note'], rows, { fontSize: 7.5, headerFontSize: 7.6, striped: true });
+      y += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...blue);
+      doc.text(`Total priced cost: $${formatNumber(model.pricedTotal, 2)}`, margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(80, 94, 110);
+      doc.text(`${model.unpricedCount} line(s) pending rates. Generated ${model.generatedAt.toLocaleDateString()} ${model.generatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`, margin, y + 6);
+      if (model.settings.notes) doc.text(doc.splitTextToSize(`Notes: ${model.settings.notes}`, pageWidth - (margin * 2)), margin, y + 12);
+      doc.text('Generated from WaterOps chemical stock used log.', pageWidth - margin, pageHeight - 10, { align: 'right' });
+      const filenameBase = `${model.settings.costCentre || model.pool.poolName || 'cost-centre'}-chemical-costs`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const blob = doc.output('blob');
+      await saveBlob(blob, `${filenameBase || 'chemical-cost-report'}-${getLocalDateInputValue(new Date())}.pdf`, 'application/pdf');
+      showAppToast('Cost centre report generated.');
+    }
     function clearCurrentPoolStockUsedLog() {
       const pool = getSelectedPool();
       const state = loadStockState();
@@ -4903,16 +5237,18 @@
     }
 
 
-    function prefillExtraStockUsedEntry({ chemicalLabel, qty, unit, source, note }) {
+    function prefillExtraStockUsedEntry({ chemicalLabel, qty, unit, source, note, unitRate }) {
       const chemicalField = qs('extraStockChemical');
       const sourceField = qs('extraStockSource');
       const qtyField = qs('extraStockQty');
       const unitField = qs('extraStockUnit');
+      const unitCostField = qs('extraStockUnitCost');
       const noteField = qs('extraStockNote');
       if (chemicalField) chemicalField.value = chemicalLabel || '';
       if (sourceField) sourceField.value = source || 'bulk';
       if (qtyField) qtyField.value = Number.isFinite(qty) ? String(qty) : '';
       if (unitField) unitField.value = unit || 'L';
+      if (unitCostField) unitCostField.value = Number.isFinite(unitRate) ? String(unitRate) : '';
       if (noteField) noteField.value = note || 'Automatic dosing drum top-up';
       chemicalField?.focus();
     }
@@ -4924,11 +5260,13 @@
       const sourceField = qs('extraStockSource');
       const qtyField = qs('extraStockQty');
       const unitField = qs('extraStockUnit');
+      const unitCostField = qs('extraStockUnitCost');
       const noteField = qs('extraStockNote');
       const chemicalLabel = (chemicalField?.value || '').trim();
       const source = sourceField?.value || '';
       const qty = n(qtyField?.value);
       const unit = unitField?.value || 'kg';
+      const unitRate = n(unitCostField?.value);
       const note = (noteField?.value || '').trim();
       if (!chemicalLabel) {
         alert('Enter the additional bulk chemical name first.');
@@ -4960,6 +5298,8 @@
         sourceLabel: sourceLabelMap[source] || 'Source not set',
         qty,
         unit,
+        unitRate: Number.isFinite(unitRate) && unitRate >= 0 ? unitRate : null,
+        costUnit: unit,
         qtyText: `${formatNumber(qty, decimals)} ${unit}`,
         note,
         isManualExtra: true
@@ -4969,6 +5309,7 @@
       if (sourceField) sourceField.value = '';
       if (qtyField) qtyField.value = '';
       if (unitField) unitField.value = 'kg';
+      if (unitCostField) unitCostField.value = '';
       if (noteField) noteField.value = '';
       renderStockSection();
     }
@@ -7409,6 +7750,7 @@ async function savePdfReport() {
       renderStockSection();
       renderQrSection();
       renderClosedLoopTable();
+      renderPriorityAlerts();
       renderInsightsSection();
       setActiveScreen(activeScreen || 'pools');
       renderInsightsSection();
@@ -7425,6 +7767,7 @@ async function savePdfReport() {
       renderCombinedTable();
       renderStockSection();
       renderQrSection();
+      renderPriorityAlerts();
       renderInsightsSection();
       renderClosedLoopTable();
       renderDraftStatus();
@@ -7480,6 +7823,7 @@ async function savePdfReport() {
       renderCombinedTable();
       renderStockSection();
       renderQrSection();
+      renderPriorityAlerts();
       restoreSheetStatus();
       initTabs();
       renderDraftStatus();
