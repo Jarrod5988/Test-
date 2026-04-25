@@ -2880,9 +2880,19 @@
       return formatChemicalQuantity(value, unit);
     }
 
+    function inferQuantityUnit(tx) {
+      if (tx && tx.unit) return tx.unit;
+      const text = String((tx && tx.qtyText) || '').toLowerCase();
+      if (text.includes('ml')) return 'mL';
+      if (text.includes('kg')) return 'kg';
+      if (text.includes('g')) return 'g';
+      if (text.includes(' l') || text.endsWith('l')) return 'L';
+      return (chemicalMeta[tx && tx.chemical] && chemicalMeta[tx.chemical].unit) || '';
+    }
+
     function formatLoggedQuantity(tx) {
       const qty = Number(tx && tx.qty);
-      const unit = tx && tx.unit ? tx.unit : (chemicalMeta[tx && tx.chemical] && chemicalMeta[tx.chemical].unit) || '';
+      const unit = inferQuantityUnit(tx);
       if (Number.isFinite(qty) && qty > 0 && unit) return formatChemicalQuantity(qty, unit);
       return tx && tx.qtyText ? tx.qtyText : '-';
     }
