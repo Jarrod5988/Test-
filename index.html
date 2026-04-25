@@ -2024,7 +2024,7 @@
             <div class="preview-box" id="photoPreviewBox">
               <div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>
             </div>
-            <div class="photo-note" id="photoOcrStatus" style="margin-top: 8px; font-size: 12px;">Upload a Spin Touch photo and the app will try to fill free chlorine, pH, alkalinity, calcium hardness, CYA, salt, temperature, copper and phosphates automatically.</div>
+            <div class="photo-note" id="photoOcrStatus" style="margin-top: 8px; font-size: 12px;">For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills results in Spin Touch order.</div>
           </div>
           <div class="span-6" style="grid-column: span 12;">
             <div class="field">
@@ -6103,6 +6103,20 @@
       return `${prefix}.`;
     }
 
+    function getSpinTouchRowsFromInputs() {
+      return SPIN_TOUCH_SCREEN_ORDER.map(item => ({
+        label: item.label,
+        value: inputs[item.inputKey] ? n(inputs[item.inputKey].value) : null,
+        unit: item.unit,
+        decimals: item.decimals
+      }));
+    }
+
+    function getOrderedSpinTouchFieldNames(results) {
+      return SPIN_TOUCH_SCREEN_ORDER
+        .filter(item => results && results[item.key] != null)
+        .map(item => item.label.toLowerCase());
+    }
     function buildReportModel() {
       const { rows, doses, volume } = buildRecommendationRows();
       const rowsMap = {
@@ -6128,17 +6142,7 @@
         { label: 'Phosphates', value: n(inputs.phosphates.value) != null ? formatNumber(n(inputs.phosphates.value), 0) : '-' }
       ];
 
-      const spinTouchRows = [
-        { label: 'Free Chlorine', value: n(inputs.freeChlorine.value), unit: 'ppm', decimals: 2 },
-        { label: 'pH', value: n(inputs.ph.value), unit: '', decimals: 2 },
-        { label: 'Alkalinity', value: n(inputs.alkalinity.value), unit: 'ppm', decimals: 0 },
-        { label: 'Calcium Hardness', value: n(inputs.calciumHardness.value), unit: 'ppm', decimals: 0 },
-        { label: 'CYA', value: n(inputs.cyanuricAcid.value), unit: 'ppm', decimals: 0 },
-        { label: 'Salt', value: n(inputs.salt.value), unit: 'ppm', decimals: 0 },
-        { label: 'Temperature', value: n(inputs.temperature.value), unit: '°C', decimals: 1 },
-        { label: 'Copper', value: n(inputs.copper.value), unit: 'ppm', decimals: 2 },
-        { label: 'Phosphates', value: n(inputs.phosphates.value), unit: 'ppb', decimals: 0 }
-      ];
+      const spinTouchRows = getSpinTouchRowsFromInputs();
 
       const allChemicalRows = getReportDoseItems(doses).map(item => {
         const snapshot = getDoseFieldSnapshot(item.key);
@@ -6955,16 +6959,28 @@ async function savePdfReport() {
 
 
     const OCR_LABELS = {
-      freeChlorine: ['free chlorine', 'free cl', 'free ci', 'chlorine free', 'chlorine', 'fcl', 'fci', 'fel', 'fol', 'fck'],
+      freeChlorine: ['free chlorine', 'free cl', 'free ci', 'chlorine free', 'chlorine', 'fcl', 'f c l', 'fc', 'f c', 'fci', 'fel', 'fol', 'fck'],
       ph: ['p h', 'p.h', 'ph', 'ph.'],
-      alkalinity: ['total alkalinity', 'total alk', 'tot alk', 'tot. alk', 'alkalinity', 'alk'],
-      calciumHardness: ['calcium hardness', 'cal hardness', 'calc hardness', 'total hardness', 'hardness', 'hard', 'hard.'],
-      cyanuricAcid: ['cyanuric acid', 'cyanuric', 'cy acid', 'cya', 'cva', 'stabiliser', 'stabilizer'],
-      salt: ['salt', 'salinity', 'sodium chloride'],
+      alkalinity: ['total alkalinity', 'total alk', 'tot alk', 'tot. alk', 't alk', 't. alk', 'alkalinity', 'alk', 'alk.', 'aik', 'al k', 'ta'],
+      calciumHardness: ['calcium hardness', 'cal hardness', 'calc hardness', 'total hardness', 'hardness', 'hard', 'hard.', 'ch', 'c h', 'ca hardness'],
+      cyanuricAcid: ['cyanuric acid', 'cyanuric', 'cy acid', 'cya', 'c y a', 'cva', 'stabiliser', 'stabilizer'],
+      salt: ['salt', 'salinity', 'sodium chloride', 'nacl'],
       temperature: ['temperature', 'water temperature', 'water temp', 'temp'],
-      copper: ['copper', 'cu'],
-      phosphates: ['phosphates', 'phosphate', 'ortho phosphate', 'orthophosphate', 'phos']
+      copper: ['copper', 'cu', 'cu.'],
+      phosphates: ['phosphates', 'phosphate', 'ortho phosphate', 'orthophosphate', 'phos', 'pho', 'po4']
     };
+
+    const SPIN_TOUCH_SCREEN_ORDER = [
+      { key: 'freeChlorine', label: 'Free Chlorine', unit: 'ppm', decimals: 2, inputKey: 'freeChlorine' },
+      { key: 'ph', label: 'pH', unit: '', decimals: 2, inputKey: 'ph' },
+      { key: 'calciumHardness', label: 'Calcium Hardness', unit: 'ppm', decimals: 0, inputKey: 'calciumHardness' },
+      { key: 'alkalinity', label: 'Alkalinity', unit: 'ppm', decimals: 0, inputKey: 'alkalinity' },
+      { key: 'cyanuricAcid', label: 'CYA', unit: 'ppm', decimals: 0, inputKey: 'cyanuricAcid' },
+      { key: 'copper', label: 'Copper', unit: 'ppm', decimals: 2, inputKey: 'copper' },
+      { key: 'salt', label: 'Salt', unit: 'ppm', decimals: 0, inputKey: 'salt' },
+      { key: 'phosphates', label: 'Phosphates', unit: 'ppb', decimals: 0, inputKey: 'phosphates' },
+      { key: 'temperature', label: 'Temperature', unit: '°C', decimals: 1, inputKey: 'temperature' }
+    ];
 
     function setPhotoStatus(message, tone = 'info') {
       const el = qs('photoOcrStatus');
@@ -7101,28 +7117,55 @@ async function savePdfReport() {
       return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    function lineHasOcrLabel(line, cleanedLabels) {
+      const compact = cleanOcrLabelText(line);
+      const squashed = compact.replace(/\s+/g, '');
+      const words = compact.split(/\s+/).filter(Boolean);
+      return cleanedLabels.some(label => {
+        const labelSquashed = label.replace(/\s+/g, '');
+        if (labelSquashed.length <= 3) {
+          return compact.includes(label) || words.includes(labelSquashed);
+        }
+        return compact.includes(label) || squashed.includes(labelSquashed);
+      });
+    }
+
     function extractCandidatesForKey(text, key) {
       const normalised = normaliseOcrText(text);
       const candidates = [];
       const labels = OCR_LABELS[key] || [];
       const cleanedLabels = labels.map(label => cleanOcrLabelText(label)).filter(Boolean);
       labels.forEach(label => {
-        const labelPattern = escapeRegex(label).replace(/\s+/g, '\\s*');
-        const regex = new RegExp(`${labelPattern}[^0-9\\n\\r]{0,16}([0-9OoQqIl|.]{1,12})`, 'ig');
+        const rawLabelPattern = escapeRegex(label).replace(/\s+/g, '\\s*');
+        const labelSquashed = cleanOcrLabelText(label).replace(/\s+/g, '');
+        const labelPattern = labelSquashed.length <= 3
+          ? `(?:^|[^a-zA-Z0-9])${rawLabelPattern}(?=$|[^a-zA-Z0-9])`
+          : rawLabelPattern;
+        const afterRegex = new RegExp(`${labelPattern}[^0-9\\n\\r]{0,24}([0-9OoQqIl|.]{1,12})`, 'ig');
+        const beforeRegex = new RegExp(`([0-9OoQqIl|.]{1,12})[^a-zA-Z0-9\\n\\r]{0,12}${labelPattern}`, 'ig');
         let match;
-        while ((match = regex.exec(normalised)) !== null) {
+        while ((match = afterRegex.exec(normalised)) !== null) {
+          const value = normaliseNumericToken(match[1]);
+          if (value != null) candidates.push(value);
+        }
+        while ((match = beforeRegex.exec(normalised)) !== null) {
           const value = normaliseNumericToken(match[1]);
           if (value != null) candidates.push(value);
         }
       });
 
       const lines = normalised.split(/\n+/).map(line => line.trim()).filter(Boolean);
-      lines.forEach(line => {
-        const compact = cleanOcrLabelText(line);
-        const squashed = compact.replace(/\s+/g, '');
-        const hasLabel = cleanedLabels.some(label => compact.includes(label) || squashed.includes(label.replace(/\s+/g, '')));
-        if (!hasLabel) return;
-        extractNumbersFromText(line).forEach(value => candidates.push(value));
+      lines.forEach((line, index) => {
+        if (!lineHasOcrLabel(line, cleanedLabels)) return;
+        const sameLineNumbers = extractNumbersFromText(line);
+        sameLineNumbers.forEach(value => candidates.push(value));
+        if (!sameLineNumbers.length) {
+          [lines[index + 1], lines[index + 2], lines[index - 1]].filter(Boolean).forEach(neighbour => {
+            const neighbourLooksNumeric = /^[^a-zA-Z]*[0-9OoQqIl|.][^a-zA-Z]*$/.test(neighbour) || extractNumbersFromText(neighbour).length === 1;
+            if (!neighbourLooksNumeric) return;
+            extractNumbersFromText(neighbour).forEach(value => candidates.push(value));
+          });
+        }
       });
 
       return candidates;
@@ -7406,17 +7449,17 @@ async function savePdfReport() {
       const screenCanvas = box ? cropCanvas(sourceCanvas, box) : sourceCanvas;
 
       const resultsOnly = cropCanvas(screenCanvas, {
-        x: screenCanvas.width * 0.04,
-        y: screenCanvas.height * 0.18,
-        width: screenCanvas.width * 0.92,
-        height: screenCanvas.height * 0.58
+        x: screenCanvas.width * 0.03,
+        y: screenCanvas.height * 0.12,
+        width: screenCanvas.width * 0.94,
+        height: screenCanvas.height * 0.74
       });
 
       const resultsLoose = cropCanvas(screenCanvas, {
-        x: screenCanvas.width * 0.02,
-        y: screenCanvas.height * 0.12,
-        width: screenCanvas.width * 0.96,
-        height: screenCanvas.height * 0.68
+        x: screenCanvas.width * 0.01,
+        y: screenCanvas.height * 0.08,
+        width: screenCanvas.width * 0.98,
+        height: screenCanvas.height * 0.84
       });
 
       const originalScaled = scaleCanvas(resultsOnly, 2.6);
@@ -7578,16 +7621,7 @@ async function savePdfReport() {
         const { results, assessment } = await runSpinTouchOcrFromFile(file, (message) => setPhotoStatus(message), scanBtn);
         const populated = applyOcrResults(results);
         if (populated > 0) {
-          const fields = [];
-          if (results.freeChlorine != null) fields.push('free chlorine');
-          if (results.ph != null) fields.push('pH');
-          if (results.alkalinity != null) fields.push('alkalinity');
-          if (results.calciumHardness != null) fields.push('calcium hardness');
-          if (results.cyanuricAcid != null) fields.push('CYA');
-          if (results.salt != null) fields.push('salt');
-          if (results.temperature != null) fields.push('temperature');
-          if (results.copper != null) fields.push('copper');
-          if (results.phosphates != null) fields.push('phosphates');
+          const fields = getOrderedSpinTouchFieldNames(results);
           const guidanceSuffix = assessment && assessment.tips && assessment.tips.length
             ? ` Tips for next photo: ${assessment.tips.join(' ')}`
             : '';
@@ -7615,13 +7649,7 @@ async function savePdfReport() {
         const { results, assessment } = await runSpinTouchOcrFromFile(file, (message) => setIceBathPhotoStatus(index, message), scanBtn);
         const populated = applyOcrResultsToIceBath(index, results);
         if (populated > 0) {
-          const fields = [];
-          if (results.freeChlorine != null) fields.push('free chlorine');
-          if (results.ph != null) fields.push('pH');
-          if (results.alkalinity != null) fields.push('alkalinity');
-          if (results.calciumHardness != null) fields.push('calcium hardness');
-          if (results.temperature != null) fields.push('temperature');
-          if (results.phosphates != null) fields.push('phosphates');
+          const fields = getOrderedSpinTouchFieldNames(results);
           const guidanceSuffix = assessment && assessment.tips && assessment.tips.length
             ? ` Tips for next photo: ${assessment.tips.join(' ')}`
             : '';
@@ -7741,7 +7769,7 @@ async function savePdfReport() {
       clearJobPhotoAttachments();
       [1, 2, 3].forEach(index => clearIceBathPhoto(index));
       qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
-      setPhotoStatus('Upload a Spin Touch photo and the app will try to fill free chlorine, pH, alkalinity, calcium hardness, CYA, salt, temperature, copper and phosphates automatically.');
+      setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills results in Spin Touch order.');
       setDefaultDateTime();
       loadPoolDefaults();
       renderQuickActions();
@@ -7854,7 +7882,7 @@ async function savePdfReport() {
         qs('photoInput').value = '';
         qs('photoInputCamera').value = '';
         qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
-        setPhotoStatus('Upload a Spin Touch photo and the app will try to fill free chlorine, pH, alkalinity, calcium hardness, CYA, salt, temperature, copper and phosphates automatically.');
+        setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills results in Spin Touch order.');
       });
       [1, 2, 3].forEach(index => {
         const photoInput = qs(`iceBath${index}PhotoInput`);
