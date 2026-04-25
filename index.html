@@ -2024,7 +2024,7 @@
             <div class="preview-box" id="photoPreviewBox">
               <div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>
             </div>
-            <div class="photo-note" id="photoOcrStatus" style="margin-top: 8px; font-size: 12px;">For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills FC, TC, CC, pH, calcium, alk, CYA, copper, salt, phosphates and temperature in Spin Touch order.</div>
+            <div class="photo-note" id="photoOcrStatus" style="margin-top: 8px; font-size: 12px;">For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app reads in Spin Touch order: FCL, TCL, CCL, pH, ALK, HARD, CYA, COPPER, PHOS, SALT.</div>
           </div>
           <div class="span-6" style="grid-column: span 12;">
             <div class="field">
@@ -4891,7 +4891,7 @@
         customSummaryMap.set(summaryKey, existing);
       });
       const customSummary = Array.from(customSummaryMap.values()).map(item => ({
-        label: item.label,
+        label: item.reportLabel || item.label,
         text: `${formatNumber(item.qty, item.unit === 'mL' || item.unit === 'g' ? 0 : 2)} ${item.unit}`.trim()
       }));
       const summary = [...defaultSummary, ...customSummary].map(item => `<div class="metric-chip">${escapeHtml(item.label)}: ${escapeHtml(item.text)}</div>`).join('');
@@ -4914,29 +4914,32 @@
             <div class="metric-chip">Entries saved: ${transactions.length}</div>
             ${summary || '<div class="metric-chip">No stock used recorded yet</div>'}
           </div>
-          <div class="subcard" style="margin-bottom: 12px;">
-            <h3 style="margin-bottom: 10px;">Cost centre report</h3>
-            <div class="mode-note" style="margin-bottom: 10px;">Uses the saved chemical stock-used log for this selected pool. Add rates to calculate costs for the supervisor report.</div>
-            <div class="asset-form-grid">
-              <div class="field"><label for="costCentreCode">Cost centre / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" /></div>
-              <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" /></div>
-              <div class="field"><label for="costReportJobRef">Job reference</label><input id="costReportJobRef" type="text" placeholder="Optional work order" /></div>
-              <div class="field"><label for="costReportNotes">Cost notes</label><input id="costReportNotes" type="text" placeholder="Optional note for supervisor" /></div>
+          <details class="subcard" style="margin-bottom: 12px;">
+            <summary style="cursor: pointer; font-weight: 800; color: var(--accent-strong); font-size: 16px; list-style-position: inside;">Cost centre report</summary>
+            <div style="margin-top: 12px;">
+              <div class="mode-note" style="margin-bottom: 10px;">Separate supervisor costing area. Uses the saved chemical stock-used log for this selected pool. Add rates to calculate costs for the supervisor report.</div>
+              <div class="asset-form-grid">
+                <div class="field"><label for="costCentreCode">Cost centre / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" /></div>
+                <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" /></div>
+                <div class="field"><label for="costReportJobRef">Job reference</label><input id="costReportJobRef" type="text" placeholder="Optional work order" /></div>
+                <div class="field"><label for="costReportNotes">Cost notes</label><input id="costReportNotes" type="text" placeholder="Optional note for supervisor" /></div>
+              </div>
+              <div class="field-grid" style="margin: 12px 0;">
+                ${DOSE_KEYS.map(key => `
+                  <div class="field">
+                    <label for="costRate_${key}">${escapeHtml(chemicalNames[key])} ${escapeHtml(chemicalMeta[key].rateLabel || '$/unit')}</label>
+                    <input id="costRate_${key}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                  </div>
+                `).join('')}
+              </div>
+              <div class="actions" style="margin-bottom: 12px;">
+                <button class="button secondary" id="saveCostSettingsBtn" type="button">Save cost settings</button>
+                <button class="button" id="generateCostReportBtn" type="button">Generate cost report PDF</button>
+              </div>
+              <div id="costReportPreview" class="summary"></div>
+              <div id="costProjectionPreview" class="summary" style="margin-top: 10px;"></div>
             </div>
-            <div class="field-grid" style="margin: 12px 0;">
-              ${DOSE_KEYS.map(key => `
-                <div class="field">
-                  <label for="costRate_${key}">${escapeHtml(chemicalNames[key])} ${escapeHtml(chemicalMeta[key].rateLabel || '$/unit')}</label>
-                  <input id="costRate_${key}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
-                </div>
-              `).join('')}
-            </div>
-            <div class="actions" style="margin-bottom: 12px;">
-              <button class="button secondary" id="saveCostSettingsBtn" type="button">Save cost settings</button>
-              <button class="button" id="generateCostReportBtn" type="button">Generate cost report PDF</button>
-            </div>
-            <div id="costReportPreview" class="summary"></div>
-          </div>
+          </details>
           <div class="subcard" style="margin-bottom: 12px;">
             <h3 style="margin-bottom: 10px;">Additional bulk chemicals used</h3>
             <div class="mode-note" style="margin-bottom: 10px;">Preset 15 L drum top-up options are included for automatic dosing drums. Add unit cost when you need to price a chemical on the move.</div>
@@ -5096,40 +5099,131 @@
       return { qty: rawQty, unit: meta.costUnit || rawUnit || meta.unit || '' };
     }
 
+    function priceCostTransaction(tx, settings = {}) {
+      const costKey = getCostRateKey(tx);
+      const entryRate = Number(tx.unitRate);
+      const costQty = Number.isFinite(entryRate)
+        ? { qty: Number(tx.qty) || 0, unit: tx.costUnit || tx.unit || '' }
+        : getCostQuantity(tx, costKey);
+      const rates = settings.rates || {};
+      const rate = Number.isFinite(entryRate) ? entryRate : costKey ? rates[costKey] : null;
+      const lineTotal = Number.isFinite(rate) ? costQty.qty * rate : null;
+      return { costKey, costQty, rate, lineTotal };
+    }
+
     function buildCostCentreReportModel() {
       const pool = getSelectedPool();
       const settings = readCostCentreForm();
       const transactions = (loadStockState().transactions || []).filter(tx => tx.poolKey === pool.key);
       let pricedTotal = 0;
       const rows = transactions.map(tx => {
-        const costKey = getCostRateKey(tx);
-        const entryRate = Number(tx.unitRate);
-        const costQty = Number.isFinite(entryRate)
-          ? { qty: Number(tx.qty) || 0, unit: tx.costUnit || tx.unit || '' }
-          : getCostQuantity(tx, costKey);
-        const rate = Number.isFinite(entryRate) ? entryRate : costKey ? settings.rates[costKey] : null;
-        const lineTotal = Number.isFinite(rate) ? costQty.qty * rate : null;
-        if (Number.isFinite(lineTotal)) pricedTotal += lineTotal;
+        const priced = priceCostTransaction(tx, settings);
+        if (Number.isFinite(priced.lineTotal)) pricedTotal += priced.lineTotal;
         return {
           date: tx.date || '',
           chemical: tx.chemicalLabel || chemicalNames[tx.chemical] || tx.chemical || '',
           source: tx.sourceLabel || '',
           used: tx.qtyText || `${formatNumber(tx.qty || 0, 2)} ${tx.unit || ''}`.trim(),
-          costQty: `${formatNumber(costQty.qty, 2)} ${costQty.unit}`.trim(),
-          rateText: Number.isFinite(rate) ? `$${formatNumber(rate, 2)}/${costQty.unit || 'unit'}` : 'Rate not set',
-          lineTotal,
+          costQty: `${formatNumber(priced.costQty.qty, 2)} ${priced.costQty.unit}`.trim(),
+          rateText: Number.isFinite(priced.rate) ? `$${formatNumber(priced.rate, 2)}/${priced.costQty.unit || 'unit'}` : 'Rate not set',
+          lineTotal: priced.lineTotal,
           note: tx.note || ''
         };
       });
       return { pool, settings, rows, pricedTotal, unpricedCount: rows.filter(row => !Number.isFinite(row.lineTotal)).length, generatedAt: new Date() };
     }
 
+    function buildCostProjectionModel() {
+      const selectedPool = getSelectedPool();
+      const costSettingsState = getCostSettingsState();
+      const selectedSettings = readCostCentreForm();
+      const sitePools = POOLS.filter(pool => pool.site === selectedPool.site && pool.key !== 'raiders_ice_baths_all');
+      const sitePoolKeys = new Set(sitePools.map(pool => pool.key));
+      const allTransactions = loadStockState().transactions || [];
+      const siteTransactions = allTransactions.filter(tx => sitePoolKeys.has(tx.poolKey));
+      const poolMap = Object.fromEntries(POOLS.map(pool => [pool.key, pool]));
+      const perPool = new Map();
+      let siteTotal = 0;
+      let siteUnpriced = 0;
+      let selectedTotal = 0;
+      let selectedUnpriced = 0;
+      const dates = [];
+
+      siteTransactions.forEach(tx => {
+        const txPool = poolMap[tx.poolKey] || { key: tx.poolKey, poolName: tx.poolName || 'Unknown pool' };
+        const settings = tx.poolKey === selectedPool.key ? selectedSettings : (costSettingsState[tx.poolKey] || selectedSettings || { rates: {} });
+        const priced = priceCostTransaction(tx, settings);
+        const current = perPool.get(tx.poolKey) || { key: tx.poolKey, name: txPool.poolName || tx.poolName || tx.poolKey, total: 0, entries: 0, unpriced: 0 };
+        current.entries += 1;
+        if (Number.isFinite(priced.lineTotal)) {
+          current.total += priced.lineTotal;
+          siteTotal += priced.lineTotal;
+          if (tx.poolKey === selectedPool.key) selectedTotal += priced.lineTotal;
+        } else {
+          current.unpriced += 1;
+          siteUnpriced += 1;
+          if (tx.poolKey === selectedPool.key) selectedUnpriced += 1;
+        }
+        perPool.set(tx.poolKey, current);
+        const date = tx.ts ? new Date(tx.ts) : null;
+        if (date && !Number.isNaN(date.getTime())) dates.push(date);
+      });
+
+      const firstDate = dates.length ? new Date(Math.min(...dates.map(date => date.getTime()))) : null;
+      const lastDate = dates.length ? new Date(Math.max(...dates.map(date => date.getTime()))) : null;
+      const observedDays = firstDate && lastDate ? Math.max(1, Math.ceil((lastDate - firstDate) / 86400000) + 1) : 0;
+      const projectionDays = observedDays ? Math.max(7, observedDays) : 0;
+      const monthlyProjection = projectionDays ? (siteTotal / projectionDays) * 30.4 : 0;
+      const annualProjection = projectionDays ? (siteTotal / projectionDays) * 365 : 0;
+      const selectedMonthlyProjection = projectionDays ? (selectedTotal / projectionDays) * 30.4 : 0;
+      const selectedAnnualProjection = projectionDays ? (selectedTotal / projectionDays) * 365 : 0;
+
+      return {
+        selectedPool,
+        siteName: selectedPool.site || selectedPool.poolName || 'Selected site',
+        siteTotal,
+        selectedTotal,
+        siteUnpriced,
+        selectedUnpriced,
+        entries: siteTransactions.length,
+        observedDays,
+        projectionDays,
+        firstDate,
+        lastDate,
+        monthlyProjection,
+        annualProjection,
+        selectedMonthlyProjection,
+        selectedAnnualProjection,
+        perPool: Array.from(perPool.values()).sort((a, b) => b.total - a.total)
+      };
+    }
+
     function renderCostReportPreview() {
       const wrap = qs('costReportPreview');
+      const projectionWrap = qs('costProjectionPreview');
       if (!wrap) return;
       const model = buildCostCentreReportModel();
       const pending = model.unpricedCount ? `${model.unpricedCount} line(s) need rates before the total is complete.` : 'All recognised chemicals are priced.';
-      wrap.innerHTML = `<strong>${escapeHtml(model.rows.length)} chemical-use line(s)</strong><br>Total priced cost: <strong>$${escapeHtml(formatNumber(model.pricedTotal, 2))}</strong><br>${escapeHtml(pending)}`;
+      wrap.innerHTML = `<strong>${escapeHtml(model.rows.length)} chemical-use line(s)</strong><br>Selected pool priced cost: <strong>$${escapeHtml(formatNumber(model.pricedTotal, 2))}</strong><br>${escapeHtml(pending)}`;
+      if (!projectionWrap) return;
+      const projection = buildCostProjectionModel();
+      if (!projection.entries) {
+        projectionWrap.innerHTML = '<strong>Ongoing site costs</strong><br>No site stock-used costs logged yet. Record chemical use and rates to build quoting data.';
+        return;
+      }
+      const dateRange = projection.firstDate && projection.lastDate
+        ? `${projection.firstDate.toLocaleDateString()} - ${projection.lastDate.toLocaleDateString()}`
+        : 'No dated entries yet';
+      const poolRows = projection.perPool.slice(0, 6).map(item => `${escapeHtml(item.name)}: $${escapeHtml(formatNumber(item.total, 2))}${item.unpriced ? ` (${escapeHtml(item.unpriced)} unpriced)` : ''}`).join('<br>');
+      projectionWrap.innerHTML = `
+        <strong>Ongoing site costs - ${escapeHtml(projection.siteName)}</strong><br>
+        Logged site cost: <strong>$${escapeHtml(formatNumber(projection.siteTotal, 2))}</strong> from ${escapeHtml(projection.entries)} entry(s)<br>
+        Selected pool cost: <strong>$${escapeHtml(formatNumber(projection.selectedTotal, 2))}</strong><br>
+        Projected site cost: <strong>$${escapeHtml(formatNumber(projection.monthlyProjection, 2))}/month</strong> - <strong>$${escapeHtml(formatNumber(projection.annualProjection, 2))}/year</strong><br>
+        Selected pool projection: $${escapeHtml(formatNumber(projection.selectedMonthlyProjection, 2))}/month - $${escapeHtml(formatNumber(projection.selectedAnnualProjection, 2))}/year<br>
+        Basis: ${escapeHtml(dateRange)}, using ${escapeHtml(projection.projectionDays || 0)} day projection window${projection.siteUnpriced ? `, ${escapeHtml(projection.siteUnpriced)} unpriced site line(s)` : ''}.<br>
+        <span class="inline-note">Pool breakdown</span><br>${poolRows || 'No priced pool lines yet.'}
+      `;
     }
 
     function bindCostCentreControls() {
@@ -6151,7 +6245,7 @@
     }
     function getSpinTouchRowsFromInputs() {
       return SPIN_TOUCH_SCREEN_ORDER.map(item => ({
-        label: item.label,
+        label: item.reportLabel || item.label,
         value: inputs[item.inputKey] ? n(inputs[item.inputKey].value) : null,
         unit: item.unit,
         decimals: item.decimals
@@ -6161,7 +6255,7 @@
     function getOrderedSpinTouchFieldNames(results) {
       return SPIN_TOUCH_SCREEN_ORDER
         .filter(item => results && results[item.key] != null)
-        .map(item => item.label.toLowerCase());
+        .map(item => (item.reportLabel || item.label).toLowerCase());
     }
     function buildReportModel() {
       const { rows, doses, volume } = buildRecommendationRows();
@@ -7009,31 +7103,30 @@ async function savePdfReport() {
 
 
     const OCR_LABELS = {
-      freeChlorine: ['free chlorine', 'free cl', 'free ci', 'chlorine free', 'chlorine', 'fcl', 'f c l', 'fc', 'f c', 'fci', 'fel', 'fol', 'fck'],
-      totalChlorine: ['total chlorine', 'total cl', 'total ci', 'chlorine total', 'tcl', 't c l', 'tc', 't c', 'tci'],
-      combinedChlorine: ['combined chlorine', 'combined cl', 'combined ci', 'chlorine combined', 'ccl', 'c c l', 'cc', 'c c', 'cci'],
+      freeChlorine: ['fcl', 'f c l', 'free chlorine', 'free cl', 'free ci', 'chlorine free', 'fc', 'f c', 'fci', 'fel', 'fol', 'fck'],
+      totalChlorine: ['tcl', 't c l', 'total chlorine', 'total cl', 'total ci', 'chlorine total', 'tc', 't c', 'tci'],
+      combinedChlorine: ['ccl', 'c c l', 'combined chlorine', 'combined cl', 'combined ci', 'chlorine combined', 'cc', 'c c', 'cci'],
       ph: ['p h', 'p.h', 'ph', 'ph.'],
-      alkalinity: ['total alkalinity', 'total alk', 'tot alk', 'tot. alk', 't alk', 't. alk', 'alkalinity', 'alk', 'alk.', 'alky', 'alx', 'aik', 'al k', 'ta', 't a'],
-      calciumHardness: ['calcium hardness', 'cal hardness', 'calc hardness', 'total hardness', 'hardness', 'hard', 'hard.', 'ch', 'c h', 'ca hardness'],
+      alkalinity: ['alk', 'alk.', 'al k', 'total alkalinity', 'total alk', 'tot alk', 'tot. alk', 't alk', 't. alk', 'alkalinity', 'alky', 'alx', 'aik', 'ta', 't a'],
+      calciumHardness: ['hard', 'hard.', 'hardness', 'calcium hardness', 'cal hardness', 'calc hardness', 'total hardness', 'ch', 'c h', 'ca hardness'],
       cyanuricAcid: ['cyanuric acid', 'cyanuric', 'cy acid', 'cya', 'c y a', 'cva', 'stabiliser', 'stabilizer'],
       salt: ['salt', 'salinity', 'sodium chloride', 'nacl', 'na cl', 'sal', 'slt', 'salt ppm'],
       temperature: ['temperature', 'water temperature', 'water temp', 'temp'],
       copper: ['copper', 'cu', 'cu.'],
-      phosphates: ['phosphates', 'phosphate', 'ortho phosphate', 'orthophosphate', 'phos', 'pho', 'po4']
+      phosphates: ['phos', 'pho', 'phosphates', 'phosphate', 'ortho phosphate', 'orthophosphate', 'po4']
     };
 
     const SPIN_TOUCH_SCREEN_ORDER = [
-      { key: 'freeChlorine', label: 'Free Chlorine', unit: 'ppm', decimals: 2, inputKey: 'freeChlorine' },
-      { key: 'totalChlorine', label: 'Total Chlorine', unit: 'ppm', decimals: 2, inputKey: 'totalChlorine' },
-      { key: 'combinedChlorine', label: 'Combined Chlorine', unit: 'ppm', decimals: 2, inputKey: 'combinedChlorine' },
-      { key: 'ph', label: 'pH', unit: '', decimals: 2, inputKey: 'ph' },
-      { key: 'calciumHardness', label: 'Calcium Hardness', unit: 'ppm', decimals: 0, inputKey: 'calciumHardness' },
-      { key: 'alkalinity', label: 'Alkalinity', unit: 'ppm', decimals: 0, inputKey: 'alkalinity' },
-      { key: 'cyanuricAcid', label: 'CYA', unit: 'ppm', decimals: 0, inputKey: 'cyanuricAcid' },
-      { key: 'copper', label: 'Copper', unit: 'ppm', decimals: 2, inputKey: 'copper' },
-      { key: 'salt', label: 'Salt', unit: 'ppm', decimals: 0, inputKey: 'salt' },
-      { key: 'phosphates', label: 'Phosphates', unit: 'ppb', decimals: 0, inputKey: 'phosphates' },
-      { key: 'temperature', label: 'Temperature', unit: '°C', decimals: 1, inputKey: 'temperature' }
+      { key: 'freeChlorine', label: 'FCL', reportLabel: 'Free Chlorine', unit: 'ppm', decimals: 2, inputKey: 'freeChlorine' },
+      { key: 'totalChlorine', label: 'TCL', reportLabel: 'Total Chlorine', unit: 'ppm', decimals: 2, inputKey: 'totalChlorine' },
+      { key: 'combinedChlorine', label: 'CCL', reportLabel: 'Combined Chlorine', unit: 'ppm', decimals: 2, inputKey: 'combinedChlorine' },
+      { key: 'ph', label: 'pH', reportLabel: 'pH', unit: '', decimals: 2, inputKey: 'ph' },
+      { key: 'alkalinity', label: 'ALK', reportLabel: 'Alkalinity', unit: 'ppm', decimals: 0, inputKey: 'alkalinity' },
+      { key: 'calciumHardness', label: 'HARD', reportLabel: 'Calcium Hardness', unit: 'ppm', decimals: 0, inputKey: 'calciumHardness' },
+      { key: 'cyanuricAcid', label: 'CYA', reportLabel: 'CYA', unit: 'ppm', decimals: 0, inputKey: 'cyanuricAcid' },
+      { key: 'copper', label: 'COPPER', reportLabel: 'Copper', unit: 'ppm', decimals: 2, inputKey: 'copper' },
+      { key: 'phosphates', label: 'PHOS', reportLabel: 'Phosphates', unit: 'ppb', decimals: 0, inputKey: 'phosphates' },
+      { key: 'salt', label: 'SALT', reportLabel: 'Salt', unit: 'ppm', decimals: 0, inputKey: 'salt' }
     ];
 
     function setPhotoStatus(message, tone = 'info') {
@@ -7257,22 +7350,93 @@ async function savePdfReport() {
         .map(row => row.words.sort((a, b) => a.x - b.x).map(word => word.text).join(' '))
         .join('\n');
     }
-    function parseSpinTouchResults(text) {
+    function parseSpinTouchTwoColumnLayout(text) {
+      const rows = normaliseOcrText(text)
+        .split(/\n+/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .filter(line => !/test\s*time|test\s*results|apr|may|jun|jul|aug|sep|oct|nov|dec|jan|feb|mar|\d{4}/i.test(line));
+      const layoutRows = [
+        ['freeChlorine', 'calciumHardness'],
+        ['totalChlorine', 'cyanuricAcid'],
+        ['combinedChlorine', 'copper'],
+        ['ph', 'phosphates'],
+        ['alkalinity', 'salt']
+      ];
       const results = {};
+      const numericRows = rows
+        .map(line => extractNumbersFromText(line))
+        .filter(numbers => numbers.length >= 2)
+        .slice(0, layoutRows.length);
+
+      numericRows.forEach((numbers, rowIndex) => {
+        const keys = layoutRows[rowIndex];
+        if (!keys) return;
+        keys.forEach((key, index) => {
+          const value = chooseBestValue(key, [numbers[index]]);
+          if (value != null) results[key] = value;
+        });
+      });
+      return results;
+    }
+    function parseKnownSpinTouchPairs(text) {
+      const results = {};
+      const labelMap = {
+        fcl: 'freeChlorine',
+        fc1: 'freeChlorine',
+        tcl: 'totalChlorine',
+        tc1: 'totalChlorine',
+        ccl: 'combinedChlorine',
+        cc1: 'combinedChlorine',
+        ph: 'ph',
+        alk: 'alkalinity',
+        aik: 'alkalinity',
+        alx: 'alkalinity',
+        hard: 'calciumHardness',
+        haro: 'calciumHardness',
+        cya: 'cyanuricAcid',
+        cva: 'cyanuricAcid',
+        copper: 'copper',
+        phos: 'phosphates',
+        pho5: 'phosphates',
+        salt: 'salt',
+        sa1t: 'salt',
+        saIt: 'salt'
+      };
+      const pairRegex = /\b(FCL|FC1|TCL|TC1|CCL|CC1|pH|PH|ALK|AIK|ALX|HARD|HARO|CYA|CVA|COPPER|PHOS|PHO5|SALT|SA1T|SAIT)\b[^0-9OoQqIl|.]{0,10}([0-9OoQqIl|.]{1,12})/gi;
+      let match;
+      while ((match = pairRegex.exec(normaliseOcrText(text))) !== null) {
+        const label = String(match[1] || '').toLowerCase();
+        const key = labelMap[label];
+        if (!key) continue;
+        const value = normaliseNumericToken(match[2]);
+        const chosen = chooseBestValue(key, [value]);
+        if (chosen != null) results[key] = chosen;
+      }
+      return results;
+    }
+    function parseSpinTouchResults(text) {
+      const results = parseSpinTouchTwoColumnLayout(text);
+      Object.assign(results, parseKnownSpinTouchPairs(text));
       Object.keys(OCR_LABELS).forEach(key => {
         const candidates = extractCandidatesForKey(text, key);
         const chosen = chooseBestValue(key, candidates);
-        if (chosen != null) results[key] = chosen;
+        if (chosen != null && results[key] == null) results[key] = chosen;
       });
       return results;
     }
 
     function mergeSpinTouchResults(resultSets, rawTexts = []) {
       const merged = {};
+      rawTexts.forEach(text => Object.assign(merged, parseSpinTouchTwoColumnLayout(text), parseKnownSpinTouchPairs(text)));
       Object.keys(OCR_LABELS).forEach(key => {
         const allCandidates = [];
         rawTexts.forEach(text => {
           extractCandidatesForKey(text, key).forEach(value => allCandidates.push(value));
+          const layoutResults = parseSpinTouchTwoColumnLayout(text);
+          if (layoutResults[key] != null) allCandidates.push(layoutResults[key]);
+          const pairResults = parseKnownSpinTouchPairs(text);
+          if (pairResults[key] != null) allCandidates.push(pairResults[key]);
         });
         resultSets.forEach(set => {
           if (set && set[key] != null) allCandidates.push(set[key]);
@@ -7860,7 +8024,7 @@ async function savePdfReport() {
       clearJobPhotoAttachments();
       [1, 2, 3].forEach(index => clearIceBathPhoto(index));
       qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
-      setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills FC, TC, CC, pH, calcium, alk, CYA, copper, salt, phosphates and temperature in Spin Touch order.');
+      setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app reads in Spin Touch order: FCL, TCL, CCL, pH, ALK, HARD, CYA, COPPER, PHOS, SALT.');
       setDefaultDateTime();
       loadPoolDefaults();
       renderQuickActions();
@@ -7974,7 +8138,7 @@ async function savePdfReport() {
         qs('photoInput').value = '';
         qs('photoInputCamera').value = '';
         qs('photoPreviewBox').innerHTML = '<div class="placeholder">No photo attached. Add a photo and the app will try to fill the test results automatically.</div>';
-        setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app fills FC, TC, CC, pH, calcium, alk, CYA, copper, salt, phosphates and temperature in Spin Touch order.');
+        setPhotoStatus('For best results, fill the photo with the blue Spin Touch screen, hold square-on, tap to focus, then read. The app reads in Spin Touch order: FCL, TCL, CCL, pH, ALK, HARD, CYA, COPPER, PHOS, SALT.');
       });
       [1, 2, 3].forEach(index => {
         const photoInput = qs(`iceBath${index}PhotoInput`);
