@@ -2633,6 +2633,7 @@
       { key: 'noIssuesObserved', label: 'No issues observed', sentence: 'No issues were observed at the time of service.' }
     ];
     const QR_SIZE = 180;
+    const DEFAULT_TECHNICIAN_NAMES = ['Jarrod Strange', 'Mark Seebohm', 'Daniel Searle'];
     const HISTORY_STORAGE_KEY = 'mbs-pool-history-v1';
     const SITE_MEMORY_STORAGE_KEY = 'mbs-site-memory-v1';
     const ASSET_STORAGE_KEY = 'mbs-asset-registry-v1';
@@ -2642,6 +2643,7 @@
     const SHEET_STATUS_STORAGE_KEY = 'mbs-sheet-status-v1';
     const COST_SYNC_DEVICE_KEY = 'mbs-cost-sync-device-id-v1';
     const COST_SYNC_LAST_PULL_KEY = 'mbs-cost-sync-last-pull-v1';
+    const TECHNICIAN_STORAGE_KEY = 'mbs-technician-names-v1';
     const COST_SYNC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     const DEFAULT_GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxim0-6TTC5IBLXUAG7vYDE8wf_criRVROl5uuDmAdWfe3rkWh-3wHitmbYEUjtjFkR/exec';
     let activeScreen = 'pools';
@@ -4506,6 +4508,52 @@
       });
     }
 
+
+    function normaliseTechnicianNames(names) {
+      const seen = new Set();
+      return (Array.isArray(names) ? names : [])
+        .map(name => String(name || '').trim())
+        .filter(name => {
+          const key = name.toLowerCase();
+          if (!name || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort((a, b) => a.localeCompare(b));
+    }
+
+    function populateTechnicianSelects(names = []) {
+      const merged = normaliseTechnicianNames([...DEFAULT_TECHNICIAN_NAMES, ...names]);
+      ['reportTechnician', 'closedTechnician'].forEach(id => {
+        const select = qs(id);
+        if (!select) return;
+        const current = select.value || '';
+        const options = normaliseTechnicianNames(current ? [...merged, current] : merged);
+        select.innerHTML = '<option value="">Select technician</option>' + options.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+        if (current) select.value = current;
+      });
+    }
+
+    function restoreTechnicianNames() {
+      populateTechnicianSelects(loadJson(TECHNICIAN_STORAGE_KEY, DEFAULT_TECHNICIAN_NAMES));
+    }
+
+    async function refreshTechnicianNamesFromGoogleSheetQuietly(delayMs = 1200) {
+      const url = getGoogleScriptUrl();
+      if (!url) return;
+      setTimeout(async () => {
+        try {
+          const response = await requestGoogleJsonp('technicianList');
+          const names = normaliseTechnicianNames((response && (response.names || response.technicians)) || []);
+          if (names.length) {
+            saveJson(TECHNICIAN_STORAGE_KEY, names);
+            populateTechnicianSelects(names);
+          }
+        } catch (error) {
+          console.info('Technician sync skipped', error);
+        }
+      }, delayMs);
+    }
     function applyCostSyncSnapshot(snapshot = {}) {
       const incomingStock = snapshot.stock || {};
       const incomingTransactions = Array.isArray(incomingStock.transactions) ? incomingStock.transactions : [];
@@ -4562,10 +4610,19 @@
     function startCostSyncAutoRefresh() {
       refreshCostDataFromGoogleSheetQuietly(900);
       if (costSyncRefreshTimer) clearInterval(costSyncRefreshTimer);
-      costSyncRefreshTimer = setInterval(() => refreshCostDataFromGoogleSheetQuietly(0), COST_SYNC_REFRESH_INTERVAL_MS);
-      window.addEventListener('focus', () => refreshCostDataFromGoogleSheetQuietly(0));
+      costSyncRefreshTimer = setInterval(() => {
+        refreshCostDataFromGoogleSheetQuietly(0);
+        refreshTechnicianNamesFromGoogleSheetQuietly(0);
+      }, COST_SYNC_REFRESH_INTERVAL_MS);
+      window.addEventListener('focus', () => {
+        refreshCostDataFromGoogleSheetQuietly(0);
+        refreshTechnicianNamesFromGoogleSheetQuietly(0);
+      });
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshCostDataFromGoogleSheetQuietly(0);
+        if (!document.hidden) {
+          refreshCostDataFromGoogleSheetQuietly(0);
+          refreshTechnicianNamesFromGoogleSheetQuietly(0);
+        }
       });
     }
     async function updateLiveMasterSheetBatch(payloads) {
