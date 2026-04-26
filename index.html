@@ -261,6 +261,47 @@
       color: var(--ink);
     }
 
+    .pin-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(7, 31, 51, 0.42);
+      backdrop-filter: blur(5px);
+    }
+
+    .pin-dialog {
+      width: min(360px, 100%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 18px 48px rgba(8, 50, 82, 0.22);
+      padding: 16px;
+    }
+
+    .pin-dialog h3 {
+      margin: 0 0 6px;
+      color: var(--ink);
+      font-size: 18px;
+    }
+
+    .pin-dialog p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .pin-dialog input {
+      text-align: center;
+      font-size: 24px;
+      letter-spacing: 4px;
+      font-weight: 800;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
@@ -2668,6 +2709,20 @@
     </div>
   </main>
   <div id="appToast" class="app-toast" role="status" aria-live="polite"></div>
+  <div class="pin-backdrop hidden" id="pinDialog" role="dialog" aria-modal="true" aria-labelledby="pinDialogTitle">
+    <form class="pin-dialog" id="pinDialogForm">
+      <h3 id="pinDialogTitle">Enter PIN</h3>
+      <p id="pinDialogMessage">Confirm admin access for this device.</p>
+      <div class="field">
+        <label for="pinDialogInput">PIN code</label>
+        <input id="pinDialogInput" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="12" />
+      </div>
+      <div class="actions" style="margin-top: 12px;">
+        <button class="button" type="submit">Confirm PIN</button>
+        <button class="button ghost" id="pinDialogCancelBtn" type="button">Cancel</button>
+      </div>
+    </form>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -4739,6 +4794,39 @@
       return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Not verified';
     }
 
+    function requestPinCode(name) {
+      const dialog = qs('pinDialog');
+      const form = qs('pinDialogForm');
+      const input = qs('pinDialogInput');
+      const message = qs('pinDialogMessage');
+      const cancel = qs('pinDialogCancelBtn');
+      if (!dialog || !form || !input || !cancel) return Promise.resolve('');
+      if (message) message.textContent = `Confirm access for ${name}. This device will remember the verified role.`;
+      input.value = '';
+      dialog.classList.remove('hidden');
+      setTimeout(() => input.focus(), 0);
+      return new Promise(resolve => {
+        const cleanup = value => {
+          dialog.classList.add('hidden');
+          form.removeEventListener('submit', onSubmit);
+          cancel.removeEventListener('click', onCancel);
+          input.removeEventListener('keydown', onKeydown);
+          resolve(value);
+        };
+        const onSubmit = event => {
+          event.preventDefault();
+          cleanup(input.value.trim());
+        };
+        const onCancel = () => cleanup('');
+        const onKeydown = event => {
+          if (event.key === 'Escape') cleanup('');
+        };
+        form.addEventListener('submit', onSubmit);
+        cancel.addEventListener('click', onCancel);
+        input.addEventListener('keydown', onKeydown);
+      });
+    }
+
     function applyAccessControls() {
       const hasRules = hasTechnicianAccessRules();
       const role = getCurrentAccessRole();
@@ -4783,7 +4871,7 @@
         applyAccessControls();
         return true;
       }
-      const pin = window.prompt(`Enter PIN for ${cleanName}`);
+      const pin = await requestPinCode(cleanName);
       if (!pin) {
         applyAccessControls();
         return false;
