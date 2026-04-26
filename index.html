@@ -1887,7 +1887,7 @@
         </div>
       </div>
       <div class="toolbar">
-        <button class="button ghost" id="resetBtn" type="button">Reset last pool test</button>
+        <button class="button ghost" id="resetBtn" type="button">Reset last test</button>
         <button class="button secondary" id="loadDefaultsBtn" type="button">Reload pool defaults</button>
         <!-- Dark mode toggle removed -->
       </div>
@@ -4196,7 +4196,7 @@
       if (!banner) return;
       const stored = loadJson(STORAGE_KEY, {});
       const savedAt = stored && stored.__draftSavedAt ? stored.__draftSavedAt : '';
-      banner.innerHTML = `Incomplete visits auto-save on this device. Last saved: <strong>${escapeHtml(formatSavedDateTime(savedAt))}</strong>. Use Reset last pool test to clear the draft.`;
+      banner.innerHTML = `Incomplete visits auto-save on this device. Last saved: <strong>${escapeHtml(formatSavedDateTime(savedAt))}</strong>. Use Reset last test to clear the draft.`;
     }
 
     function getWatchItemsState() {
