@@ -2361,18 +2361,16 @@
         <div class="hint" id="closedLoopSiteNote" style="margin: 0 0 12px;">Select a preloaded site to load its closed-loop systems.</div>
         <div class="field">
           <label for="closedNotes">Closed loop notes</label>
-          <textarea id="closedNotes" placeholder="Optional notes about dosing, make-up water, pressure, air ingress, leaks, filter changes, corrosion risk, glycol, odour/slime or actions taken"></textarea>
+          <textarea id="closedNotes" placeholder="Optional notes about dosing, make-up water, low pressure, filter changes, corrosion risk, glycol or actions taken"></textarea>
         </div>
       </section>
 
       <section class="card span-12 hidden" id="closedLoopFieldChecksCard">
         <h2>Closed loop field checks</h2>
         <div class="field-grid">
-          <div class="field"><label for="closedMakeupStatus">Make-up / pressure</label><select id="closedMakeupStatus"><option value="Not checked">Not checked</option><option value="Stable">Stable</option><option value="High make-up or pressure issue">High make-up or pressure issue</option></select></div>
-          <div class="field"><label for="closedAirLeakStatus">Air / leak signs</label><select id="closedAirLeakStatus"><option value="Not checked">Not checked</option><option value="No issue observed">No issue observed</option><option value="Air or leak suspected">Air or leak suspected</option></select></div>
+          <div class="field"><label for="closedMakeupStatus">Make-up / pressure</label><select id="closedMakeupStatus"><option value="Not checked">Not checked</option><option value="Stable">Stable</option><option value="Low pressure">Low pressure</option><option value="High make-up or pressure issue">High make-up or pressure issue</option></select></div>
           <div class="field"><label for="closedFilterStatus">Filter / strainer</label><select id="closedFilterStatus"><option value="Not checked">Not checked</option><option value="Clean">Clean</option><option value="Needs cleaning">Needs cleaning</option></select></div>
           <div class="field"><label for="closedCorrosionStatus">Corrosion / debris</label><select id="closedCorrosionStatus"><option value="Not checked">Not checked</option><option value="Clear sample">Clear sample</option><option value="Discolouration or debris noted">Discolouration or debris noted</option></select></div>
-          <div class="field"><label for="closedMicroStatus">Odour / slime</label><select id="closedMicroStatus"><option value="Not checked">Not checked</option><option value="No issue observed">No issue observed</option><option value="Odour or slime noted">Odour or slime noted</option></select></div>
           <div class="field"><label for="closedGlycolStatus">Glycol / freeze point</label><select id="closedGlycolStatus"><option value="Not applicable">Not applicable</option><option value="Checked in range">Checked in range</option><option value="Check required">Check required</option></select></div>
         </div>
       </section>
@@ -5070,10 +5068,8 @@
     function buildClosedLoopFieldChecks() {
       return [
         { label: 'Make-up / pressure', value: inputs.closedMakeupStatus?.value || 'Not checked' },
-        { label: 'Air / leak signs', value: inputs.closedAirLeakStatus?.value || 'Not checked' },
         { label: 'Filter / strainer', value: inputs.closedFilterStatus?.value || 'Not checked' },
         { label: 'Corrosion / debris', value: inputs.closedCorrosionStatus?.value || 'Not checked' },
-        { label: 'Odour / slime', value: inputs.closedMicroStatus?.value || 'Not checked' },
         { label: 'Glycol / freeze point', value: inputs.closedGlycolStatus?.value || 'Not applicable' }
       ];
     }
@@ -8609,7 +8605,7 @@ async function savePdfReport() {
         'ctxOwnerChemicals', 'ctxNoCirculation', 'ctxHeavySun', 'ctxHighBatherLoad', 'ctxRainDilution', 'ctxTopUpOff',
         'assetType', 'assetId', 'assetLocation', 'assetStatus', 'assetNote',
         'closedSite', 'closedSystemName', 'closedTechnician', 'closedDate', 'closedTime', 'closedVisitInterval', 'closedNotes',
-        'closedMakeupStatus', 'closedAirLeakStatus', 'closedFilterStatus', 'closedCorrosionStatus', 'closedMicroStatus', 'closedGlycolStatus',
+        'closedMakeupStatus', 'closedFilterStatus', 'closedCorrosionStatus', 'closedGlycolStatus',
         'hhwTds', 'hhwTdsMin', 'hhwTdsMax', 'hhwPh', 'hhwPhMin', 'hhwPhMax', 'hhwInhibitor', 'hhwInhibitorMin', 'hhwInhibitorMax',
         'chwTds', 'chwTdsMin', 'chwTdsMax', 'chwPh', 'chwPhMin', 'chwPhMax', 'chwInhibitor', 'chwInhibitorMin', 'chwInhibitorMax',
         'iceBath1Clarity', 'iceBath1Ph', 'iceBath1Fc', 'iceBath1Tc', 'iceBath1Alk', 'iceBath1Calcium', 'iceBath1Temp', 'iceBath1Phosphates', 'iceBath1Note',
