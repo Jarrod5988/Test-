@@ -246,6 +246,21 @@
       gap: 10px;
     }
 
+    .access-status {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.72);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .access-status strong {
+      color: var(--ink);
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
@@ -1891,6 +1906,7 @@
         <button class="button secondary" id="loadDefaultsBtn" type="button">Reload pool defaults</button>
         <!-- Dark mode toggle removed -->
       </div>
+      <div class="access-status" id="accessStatusBox">Access: setup unlocked until technician roles are loaded.</div>
     </div>
 
     <!--
@@ -2691,6 +2707,8 @@
     const COST_SYNC_LAST_PULL_KEY = 'mbs-cost-sync-last-pull-v1';
     const TECHNICIAN_STORAGE_KEY = 'mbs-technician-names-v1';
     const TECHNICIAN_PROFILE_STORAGE_KEY = 'mbs-technician-profile-v1';
+    const TECHNICIAN_ACCESS_STORAGE_KEY = 'mbs-technician-access-v1';
+    const TECHNICIAN_AUTH_STORAGE_KEY = 'mbs-technician-auth-v1';
     const COST_SYNC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
     const CLOSED_LOOP_SITES = [
       {
@@ -4548,13 +4566,17 @@
       showAppToast('Cost data backup sent.');
     }
 
-    function requestGoogleJsonp(action) {
+    function requestGoogleJsonp(action, params = {}) {
       const url = getGoogleScriptUrl();
       if (!url) return Promise.reject(new Error('Google Apps Script URL is blank.'));
       return new Promise((resolve, reject) => {
         const callbackName = `waterOpsCostSync_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         const script = document.createElement('script');
         const separator = url.includes('?') ? '&' : '?';
+        const extraParams = Object.entries(params || {})
+          .filter(([, value]) => value != null && value !== '')
+          .map(([key, value]) => `&${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+          .join('');
         const timer = setTimeout(() => {
           cleanup();
           reject(new Error('Timed out waiting for Google Sheet sync.'));
@@ -4572,7 +4594,7 @@
           cleanup();
           reject(new Error('Google Sheet sync script could not load.'));
         };
-        script.src = `${url}${separator}action=${encodeURIComponent(action)}&callback=${encodeURIComponent(callbackName)}&deviceId=${encodeURIComponent(getCostSyncDeviceId())}`;
+        script.src = `${url}${separator}action=${encodeURIComponent(action)}&callback=${encodeURIComponent(callbackName)}&deviceId=${encodeURIComponent(getCostSyncDeviceId())}${extraParams}`;
         document.body.appendChild(script);
       });
     }
@@ -4625,6 +4647,8 @@
     function handleTechnicianSelection(event) {
       const selectedName = String((event && event.target && event.target.value) || '').trim();
       if (!selectedName) return;
+      const existingAuth = getCurrentTechnicianAuth();
+      if (!existingAuth || existingAuth.name !== selectedName) localStorage.removeItem(TECHNICIAN_AUTH_STORAGE_KEY);
       savePreferredTechnicianName(selectedName);
       ['reportTechnician', 'closedTechnician'].forEach(id => {
         const select = qs(id);
@@ -4632,6 +4656,7 @@
         ensureTechnicianOption(select, selectedName);
         select.value = selectedName;
       });
+      verifyTechnicianAccess(selectedName);
       saveState();
     }
 
@@ -4653,16 +4678,149 @@
       populateTechnicianSelects(loadJson(TECHNICIAN_STORAGE_KEY, DEFAULT_TECHNICIAN_NAMES));
     }
 
+    function normaliseTechnicianAccess(list = []) {
+      const seen = new Set();
+      return (Array.isArray(list) ? list : [])
+        .map(item => {
+          const name = typeof item === 'string' ? item : item && item.name;
+          const role = String((item && item.role) || 'tech').trim().toLowerCase();
+          return {
+            name: String(name || '').trim(),
+            role: ['admin', 'supervisor', 'tech'].includes(role) ? role : 'tech',
+            pinRequired: !!(item && item.pinRequired),
+            active: item && item.active === false ? false : true
+          };
+        })
+        .filter(item => {
+          const key = item.name.toLowerCase();
+          if (!item.name || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    function getTechnicianAccessList() {
+      return normaliseTechnicianAccess(loadJson(TECHNICIAN_ACCESS_STORAGE_KEY, []));
+    }
+
+    function getTechnicianAccess(name) {
+      const key = String(name || '').trim().toLowerCase();
+      if (!key) return null;
+      return getTechnicianAccessList().find(item => item.name.toLowerCase() === key) || null;
+    }
+
+    function hasTechnicianAccessRules() {
+      return getTechnicianAccessList().some(item => item.active && (item.role || item.pinRequired));
+    }
+
+    function getCurrentTechnicianAuth() {
+      const auth = loadJson(TECHNICIAN_AUTH_STORAGE_KEY, {});
+      const preferred = getPreferredTechnicianName();
+      if (!auth || !auth.name || auth.name !== preferred) return null;
+      return auth;
+    }
+
+    function getCurrentAccessRole() {
+      if (!hasTechnicianAccessRules()) return 'admin';
+      const preferred = getPreferredTechnicianName();
+      const access = getTechnicianAccess(preferred);
+      if (access && access.active && !access.pinRequired) return access.role;
+      const auth = getCurrentTechnicianAuth();
+      if (auth && auth.role) return auth.role;
+      return '';
+    }
+
+    function isAdminUnlocked() {
+      return getCurrentAccessRole() === 'admin';
+    }
+
+    function roleLabel(role) {
+      return role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Not verified';
+    }
+
+    function applyAccessControls() {
+      const hasRules = hasTechnicianAccessRules();
+      const role = getCurrentAccessRole();
+      const isAdmin = role === 'admin';
+      const preferred = getPreferredTechnicianName();
+      document.querySelectorAll('[data-screen="admin"]').forEach(btn => {
+        btn.classList.toggle('hidden', hasRules && !isAdmin);
+      });
+      if (activeScreen === 'admin' && hasRules && !isAdmin) {
+        activeScreen = 'pools';
+        setActiveScreen('pools');
+        return;
+      }
+      const box = qs('accessStatusBox');
+      if (box) {
+        box.innerHTML = hasRules
+          ? `<strong>Access:</strong> ${escapeHtml(preferred || 'Select technician')} - ${escapeHtml(roleLabel(role))}${isAdmin ? ' access' : ''}`
+          : '<strong>Access:</strong> setup unlocked until technician roles are loaded from Google Sheets.';
+      }
+    }
+
+    async function verifyTechnicianAccess(name) {
+      const cleanName = String(name || '').trim();
+      if (!cleanName || !hasTechnicianAccessRules()) {
+        applyAccessControls();
+        return true;
+      }
+      const access = getTechnicianAccess(cleanName);
+      if (!access || !access.active) {
+        localStorage.removeItem(TECHNICIAN_AUTH_STORAGE_KEY);
+        applyAccessControls();
+        showAppToast('Technician is not active for app access.');
+        return false;
+      }
+      if (!access.pinRequired) {
+        saveJson(TECHNICIAN_AUTH_STORAGE_KEY, { name: cleanName, role: access.role, verifiedAt: new Date().toISOString() });
+        applyAccessControls();
+        return true;
+      }
+      const existing = getCurrentTechnicianAuth();
+      if (existing && existing.name === cleanName && existing.role) {
+        applyAccessControls();
+        return true;
+      }
+      const pin = window.prompt(`Enter PIN for ${cleanName}`);
+      if (!pin) {
+        applyAccessControls();
+        return false;
+      }
+      try {
+        const response = await requestGoogleJsonp('verifyTechnician', { name: cleanName, pin });
+        if (!response || response.ok === false || !response.verified) {
+          throw new Error(response && response.error ? response.error : 'PIN not verified.');
+        }
+        saveJson(TECHNICIAN_AUTH_STORAGE_KEY, { name: cleanName, role: response.role || access.role || 'tech', verifiedAt: new Date().toISOString() });
+        applyAccessControls();
+        showAppToast(`${cleanName} verified as ${roleLabel(response.role || access.role || 'tech')}.`);
+        return true;
+      } catch (error) {
+        localStorage.removeItem(TECHNICIAN_AUTH_STORAGE_KEY);
+        applyAccessControls();
+        alert(`Access check failed: ${error.message || error}`);
+        return false;
+      }
+    }
+
     async function refreshTechnicianNamesFromGoogleSheetQuietly(delayMs = 1200) {
       const url = getGoogleScriptUrl();
       if (!url) return;
       setTimeout(async () => {
         try {
           const response = await requestGoogleJsonp('technicianList');
-          const names = normaliseTechnicianNames((response && (response.names || response.technicians)) || []);
+          const technicianAccess = normaliseTechnicianAccess((response && response.technicians) || []);
+          const names = normaliseTechnicianNames((response && response.names) || technicianAccess.map(item => item.name));
           if (names.length) {
             saveJson(TECHNICIAN_STORAGE_KEY, names);
             populateTechnicianSelects(names);
+          }
+          if (technicianAccess.length) {
+            saveJson(TECHNICIAN_ACCESS_STORAGE_KEY, technicianAccess);
+            applyAccessControls();
+            verifyTechnicianAccess(getPreferredTechnicianName());
           }
         } catch (error) {
           console.info('Technician sync skipped', error);
@@ -5585,6 +5743,10 @@
     function setActiveScreen(screen) {
       const map = { pools: 'screenPools', closedLoops: 'screenClosedLoops', insights: 'screenInsights', costCentre: 'screenCostCentre', admin: 'screenAdmin' };
       if (!map[screen]) screen = 'pools';
+      if (screen === 'admin' && hasTechnicianAccessRules() && !isAdminUnlocked()) {
+        showAppToast('Admin setup is locked for this technician.');
+        screen = 'pools';
+      }
       activeScreen = screen;
       localStorage.setItem(ACTIVE_SCREEN_STORAGE_KEY, screen);
       Object.entries(map).forEach(([key, id]) => {
@@ -5605,6 +5767,7 @@
       if (screen === 'admin') renderQrSection();
       if (screen === 'costCentre') renderCostCentreSection();
       if (screen === 'pools') { renderCombinedTable(); renderStockSection(); }
+      applyAccessControls();
     }
 
     let appToastTimer = null;
@@ -5785,26 +5948,29 @@
     function renderCostCentreSection() {
       const wrap = qs('costCentreContent');
       if (!wrap) return;
+      const canEditCosts = isAdminUnlocked();
+      const costEditAttr = canEditCosts ? '' : 'disabled';
       wrap.innerHTML = `
         <div class="subcard" style="margin-top: 12px;">
           <h3 style="margin-bottom: 10px;">Site costs report</h3>
           <div class="mode-note" style="margin-bottom: 10px;">Supervisor costing area. Uses the saved chemical stock used log for the selected pool. Add rates to calculate reports, ongoing costs and future quote estimates.</div>
+          ${canEditCosts ? '' : '<div class="hint" style="margin-bottom: 10px;">Cost rates and saved settings are admin-only. You can still generate reports from saved rates.</div>'}
           <div class="asset-form-grid">
-            <div class="field"><label for="costCentreCode">Site cost / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" /></div>
-            <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" /></div>
-            <div class="field"><label for="costReportJobRef">Job reference</label><input id="costReportJobRef" type="text" placeholder="Optional work order" /></div>
-            <div class="field"><label for="costReportNotes">Cost notes</label><input id="costReportNotes" type="text" placeholder="Optional note for supervisor" /></div>
+            <div class="field"><label for="costCentreCode">Site cost / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" ${costEditAttr} /></div>
+            <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" ${costEditAttr} /></div>
+            <div class="field"><label for="costReportJobRef">Job reference</label><input id="costReportJobRef" type="text" placeholder="Optional work order" ${costEditAttr} /></div>
+            <div class="field"><label for="costReportNotes">Cost notes</label><input id="costReportNotes" type="text" placeholder="Optional note for supervisor" ${costEditAttr} /></div>
           </div>
           <div class="field-grid" style="margin: 12px 0;">
             ${DOSE_KEYS.map(key => `
               <div class="field">
                 <label for="costRate_${key}">${escapeHtml(chemicalNames[key])} ${escapeHtml(chemicalMeta[key].rateLabel || '$/unit')}</label>
-                <input id="costRate_${key}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                <input id="costRate_${key}" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" ${costEditAttr} />
               </div>
             `).join('')}
           </div>
           <div class="actions" style="margin-bottom: 12px;">
-            <button class="button secondary" id="saveCostSettingsBtn" type="button">Save cost settings</button>
+            <button class="button secondary ${canEditCosts ? '' : 'hidden'}" id="saveCostSettingsBtn" type="button">Save cost settings</button>
             <button class="button ghost" id="backupCostDataBtn" type="button">Backup costs to Google Sheet</button>
             <button class="button ghost" id="refreshCostDataBtn" type="button">Refresh costs from Google Sheet</button>
             <button class="button" id="generateCostReportBtn" type="button">Generate cost report PDF</button>
@@ -5860,6 +6026,10 @@
     }
 
     function saveCurrentCostSettings() {
+      if (!isAdminUnlocked()) {
+        showAppToast('Only admins can save site cost settings.');
+        return;
+      }
       const pool = getSelectedPool();
       const state = getCostSettingsState();
       state[pool.key] = readCostCentreForm();
@@ -8938,6 +9108,7 @@ async function savePdfReport() {
       setDefaultDateTime();
       inputs.poolSelect.value = POOLS[0].key;
       loadState();
+      restoreTechnicianNames();
       applyUrlSelection();
       if (!inputs.poolSelect.value) inputs.poolSelect.value = POOLS[0].key;
       loadPoolDefaults();
@@ -8949,6 +9120,8 @@ async function savePdfReport() {
       renderQrSection();
       renderPriorityAlerts();
       restoreSheetStatus();
+      applyAccessControls();
+      verifyTechnicianAccess(getPreferredTechnicianName());
       startCostSyncAutoRefresh();
       initTabs();
       renderDraftStatus();
