@@ -2315,7 +2315,7 @@
     <div class="grid">
       <section class="card span-12">
         <h2>Site costs</h2>
-        <div class="mode-note">Supervisor chemical costing, ongoing site costs and quote projections from the stock-used log.</div>
+        <div class="mode-note">Supervisor chemical costing, ongoing site costs and future quote estimates from the stock used log.</div>
         <div id="costCentreContent"></div>
       </section>
     </div>
@@ -2484,7 +2484,7 @@
           </div>
           <div class="field">
             <label for="siteMemoryText">Site memory</label>
-            <textarea id="siteMemoryText" class="memory-box" placeholder="Store the pool's personality here â€” common faults, usual pH drift, owner habits, sensor quirks, preferred doses, Enviroswim notes"></textarea>
+            <textarea id="siteMemoryText" class="memory-box" placeholder="Store site-specific notes here: common faults, usual pH drift, owner habits, sensor quirks, preferred doses, Enviroswim notes"></textarea>
           </div>
         </div>
         <div class="actions" style="margin-bottom: 12px;">
@@ -2647,7 +2647,7 @@
           <button class="button ghost" id="clearHistoryBtn" type="button">Clear visit history</button>
           <button class="button ghost" id="clearAssetsBtn" type="button">Clear equipment register</button>
         </div>
-        <div class="hint">Visit history and asset notes are still local to this browser. Site costs settings and stock-used logs can now be backed up to the Google Sheet and refreshed on other devices after the matching Apps Script is installed.</div>
+        <div class="hint">Visit history and asset notes are still local to this browser. Site costs settings and stock used logs can now be backed up to the Google Sheet and refreshed on other devices after the matching Apps Script is installed.</div>
       </section>
     </div>
   </main>
@@ -3403,7 +3403,7 @@
                 <div class="icebath-compact-dose">${formatRecommendedDose(item.chemical.value, item.chemical.unit)}</div>
               </div>
               <div class="icebath-compact-facts">
-                <strong>${escapeHtml(item.result.status.label)}</strong> â€¢ ${item.result.current == null ? '-' : formatNumber(item.result.current, item.result.decimals)} â†’ ${item.result.target == null ? '-' : formatNumber(item.result.target, item.result.decimals)} â€¢ ${escapeHtml(item.result.rangeLabel || '-')}
+                <strong>${escapeHtml(item.result.status.label)}</strong> - ${item.result.current == null ? '-' : formatNumber(item.result.current, item.result.decimals)} -> ${item.result.target == null ? '-' : formatNumber(item.result.target, item.result.decimals)} - ${escapeHtml(item.result.rangeLabel || '-')}
               </div>
               <div class="icebath-compact-controls">
                 <div class="field">
@@ -4054,7 +4054,7 @@
         { label: 'Metric', value: config.label },
         { label: 'Latest', value: formatTrendMetricValue(latest, config) },
         { label: 'Average', value: formatTrendMetricValue(average, config) },
-        { label: 'Range', value: `${formatTrendMetricValue(minValue, config)} â†’ ${formatTrendMetricValue(maxValue, config)}` },
+        { label: 'Range', value: `${formatTrendMetricValue(minValue, config)} -> ${formatTrendMetricValue(maxValue, config)}` },
         { label: 'Trend', value: trendDirection },
         { label: 'Status', value: statusText }
       ].map(item => `<div class="mini-pill"><strong>${escapeHtml(item.label)}</strong>${escapeHtml(item.value)}</div>`).join('');
@@ -4253,7 +4253,7 @@
       }
       return items.map(item => {
         const stamp = item.ts ? ` (${formatDateDisplay(String(item.ts).slice(0, 10))})` : '';
-        return `<strong>${escapeHtml(item.severity || 'Info')}</strong> â€¢ ${escapeHtml(item.text || '')}${escapeHtml(stamp)}`;
+        return `<strong>${escapeHtml(item.severity || 'Info')}</strong> - ${escapeHtml(item.text || '')}${escapeHtml(stamp)}`;
       });
     }
 
@@ -4268,7 +4268,7 @@
         const pool = getSelectedPool();
         const items = getPoolWatchItems(pool.key);
         adminWrap.innerHTML = items.length
-          ? items.slice().reverse().map(item => `<div class="insight-item"><strong>${escapeHtml(item.severity || 'Info')}</strong> â€¢ ${escapeHtml(item.text || '')}${item.ts ? ` <span class="subtle">(${escapeHtml(formatSavedDateTime(item.ts))})</span>` : ''}</div>`).join('')
+          ? items.slice().reverse().map(item => `<div class="insight-item"><strong>${escapeHtml(item.severity || 'Info')}</strong> - ${escapeHtml(item.text || '')}${item.ts ? ` <span class="subtle">(${escapeHtml(formatSavedDateTime(item.ts))})</span>` : ''}</div>`).join('')
           : '<div class="insight-item">No saved watch items for this pool yet.</div>';
       }
     }
@@ -4290,7 +4290,7 @@
           const sign = delta > 0 ? '+' : '';
           deltaText = ` (${sign}${formatNumber(delta, decimals)})`;
         }
-        return `${label}: ${previousText} â†’ ${currentText}${deltaText}`;
+        return `${label}: ${previousText} -> ${currentText}${deltaText}`;
       };
       return [
         `Last snapshot: ${formatDateDisplay(last.date || '')} ${last.time || ''}`.trim(),
@@ -5788,7 +5788,7 @@
       wrap.innerHTML = `
         <div class="subcard" style="margin-top: 12px;">
           <h3 style="margin-bottom: 10px;">Site costs report</h3>
-          <div class="mode-note" style="margin-bottom: 10px;">Supervisor costing area. Uses the saved chemical stock-used log for the selected pool. Add rates to calculate reports, ongoing costs and quote projections.</div>
+          <div class="mode-note" style="margin-bottom: 10px;">Supervisor costing area. Uses the saved chemical stock used log for the selected pool. Add rates to calculate reports, ongoing costs and future quote estimates.</div>
           <div class="asset-form-grid">
             <div class="field"><label for="costCentreCode">Site cost / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" /></div>
             <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" /></div>
@@ -5996,11 +5996,11 @@
       if (!wrap) return;
       const model = buildCostCentreReportModel();
       const pending = model.unpricedCount ? `${model.unpricedCount} line(s) need rates before the total is complete.` : 'All recognised chemicals are priced.';
-      wrap.innerHTML = `<strong>${escapeHtml(model.rows.length)} chemical-use line(s)</strong><br>Selected pool priced cost: <strong>$${escapeHtml(formatNumber(model.pricedTotal, 2))}</strong><br>${escapeHtml(pending)}`;
+      wrap.innerHTML = `<strong>${escapeHtml(model.rows.length)} chemical use line(s)</strong><br>Selected pool priced cost: <strong>$${escapeHtml(formatNumber(model.pricedTotal, 2))}</strong><br>${escapeHtml(pending)}`;
       if (!projectionWrap) return;
       const projection = buildCostProjectionModel();
       if (!projection.entries) {
-        projectionWrap.innerHTML = '<strong>Ongoing site costs</strong><br>No site stock-used costs logged yet. Record chemical use and rates to build quoting data.';
+        projectionWrap.innerHTML = '<strong>Ongoing site costs</strong><br>No site chemical costs logged yet. Record chemical use and rates to build quoting data.';
         return;
       }
       const dateRange = projection.firstDate && projection.lastDate
@@ -6033,7 +6033,7 @@
     async function generateCostCentreReportPdf() {
       const model = buildCostCentreReportModel();
       if (!model.rows.length) {
-        alert('No chemical stock-used entries are logged for this pool yet. Record used chemicals first.');
+        alert('No chemical use entries are logged for this pool yet. Record used chemicals first.');
         return;
       }
       if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -6674,7 +6674,7 @@
                 <div class="icebath-compact-dose">${formatRecommendedDose(item.chemical.value, item.chemical.unit)}</div>
               </div>
               <div class="icebath-compact-facts">
-                <strong>${escapeHtml(item.result.status.label)}</strong> â€¢ ${item.result.current == null ? '-' : formatNumber(item.result.current, item.result.decimals)} â†’ ${item.result.target == null ? '-' : formatNumber(item.result.target, item.result.decimals)} â€¢ ${escapeHtml(item.result.rangeLabel || '-')}
+                <strong>${escapeHtml(item.result.status.label)}</strong> - ${item.result.current == null ? '-' : formatNumber(item.result.current, item.result.decimals)} -> ${item.result.target == null ? '-' : formatNumber(item.result.target, item.result.decimals)} - ${escapeHtml(item.result.rangeLabel || '-')}
               </div>
               <div class="icebath-compact-controls">
                 <div class="field">
@@ -6703,7 +6703,7 @@
           <div class="icebath-reference-card">
             <strong>${escapeHtml(row.parameter)}</strong>
             <div class="icebath-reference-value">${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</div>
-            <div class="subtle">${escapeHtml(row.status.label)} â€¢ ${escapeHtml(row.rangeLabel || '-')}</div>
+            <div class="subtle">${escapeHtml(row.status.label)} - ${escapeHtml(row.rangeLabel || '-')}</div>
           </div>
         `).join('');
       }
@@ -7976,7 +7976,7 @@ async function savePdfReport() {
         .replace(/[\u201C\u201D]/g, '"')
         .replace(/[\u2013\u2014]/g, '-')
         .replace(/[\u00A0]/g, ' ')
-        .replace(/[Â°]/g, ' ')
+        .replace(/[\u00B0]/g, ' ')
         .replace(/[,]/g, '.')
         .replace(/\r/g, '\n')
         .replace(/[ \t]+/g, ' ');
