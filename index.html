@@ -2372,6 +2372,7 @@
           <label class="button" for="closedPlateCameraInput">Take plate photo</label>
           <label class="button secondary" for="closedPlateInput">Add plate photo</label>
           <button class="button ghost" id="scanClosedPlateBtn" type="button">Read plate</button>
+          <button class="button ghost" id="closedEquipmentLookupBtn" type="button">Find manufacturer guidance</button>
           <button class="button ghost" id="clearClosedPlateBtn" type="button">Clear plate</button>
           <input id="closedPlateCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
           <input id="closedPlateInput" type="file" accept="image/*" class="hidden" />
@@ -2392,6 +2393,7 @@
           <label for="closedManufacturerParameterNote">Manufacturer recommended parameters</label>
           <textarea id="closedManufacturerParameterNote" placeholder="Paste verified manufacturer limits here, for example pH, conductivity/TDS, chloride, hardness, glycol, inhibitor or water-quality notes from the manual."></textarea>
         </div>
+        <div class="hint hidden" id="closedEquipmentLookupBox" style="margin-top: 12px;"></div>
         <div class="hint" style="margin-top: 12px;">The photo reader can identify plate text and material clues. Confirm manufacturer limits from the actual manual before changing site ranges.</div>
       </section>
 
@@ -4994,6 +4996,61 @@
         'Unknown': 'No confident material found on the plate. Use the model/serial to confirm heat exchanger material and manufacturer water-quality limits. ' + base
       };
       return guidance[material] || guidance.Unknown;
+    }
+
+    function buildClosedEquipmentLookup() {
+      const equipment = buildClosedLoopEquipmentModel();
+      const terms = [
+        equipment.manufacturer,
+        equipment.model,
+        equipment.equipmentType,
+        equipment.material && equipment.material !== 'Unknown' ? equipment.material : '',
+        'manufacturer manual water quality closed loop pH chloride conductivity glycol'
+      ].map(value => String(value || '').trim()).filter(Boolean);
+      const query = terms.join(' ');
+      if (!query || terms.length < 2) return null;
+      return {
+        query,
+        manualUrl: 'https://www.google.com/search?q=' + encodeURIComponent(query),
+        pdfUrl: 'https://www.google.com/search?q=' + encodeURIComponent(query + ' filetype:pdf'),
+        waterUrl: 'https://www.google.com/search?q=' + encodeURIComponent(query + ' water treatment guidelines')
+      };
+    }
+
+    function updateClosedEquipmentLookupBox(lookup) {
+      const box = qs('closedEquipmentLookupBox');
+      if (!box) return;
+      if (!lookup) {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+      box.classList.remove('hidden');
+      box.innerHTML = `
+        <strong>Manufacturer lookup</strong><br>
+        Search terms: ${escapeHtml(lookup.query)}<br>
+        <a href="${lookup.manualUrl}" target="_blank" rel="noopener">Open manual search</a> &nbsp;|&nbsp;
+        <a href="${lookup.pdfUrl}" target="_blank" rel="noopener">Search PDFs</a> &nbsp;|&nbsp;
+        <a href="${lookup.waterUrl}" target="_blank" rel="noopener">Search water-quality notes</a><br>
+        Paste the verified manual name/link/page into Manufacturer source, then paste the exact limits into Manufacturer recommended parameters.
+      `;
+    }
+
+    function findClosedEquipmentGuidance() {
+      const lookup = buildClosedEquipmentLookup();
+      if (!lookup) {
+        setClosedPlateStatus('Enter at least the manufacturer and model, or manufacturer and equipment type, then try the lookup.', 'error');
+        updateClosedEquipmentLookupBox(null);
+        return;
+      }
+      const material = inputs.closedHeatExchangerMaterial?.value || 'Unknown';
+      if (inputs.closedManufacturerParameterNote && !inputs.closedManufacturerParameterNote.value.trim()) {
+        inputs.closedManufacturerParameterNote.value = buildMaterialGuidance(material);
+      }
+      updateClosedEquipmentLookupBox(lookup);
+      setClosedPlateStatus('Lookup links built from the equipment fields. Open the manual/PDF search, then record the verified source and exact limits here.', 'success');
+      window.open(lookup.manualUrl, '_blank', 'noopener');
+      saveState();
     }
 
     function parseEquipmentPlateText(rawText) {
@@ -8918,6 +8975,7 @@ async function savePdfReport() {
       qs('closedPlateInput')?.addEventListener('change', handleClosedPlatePhotoUpload);
       qs('closedPlateCameraInput')?.addEventListener('change', handleClosedPlatePhotoUpload);
       qs('scanClosedPlateBtn')?.addEventListener('click', scanClosedPlatePhoto);
+      qs('closedEquipmentLookupBtn')?.addEventListener('click', findClosedEquipmentGuidance);
       qs('clearClosedPlateBtn')?.addEventListener('click', clearClosedPlatePhoto);
       qs('jobPhotoInput').addEventListener('change', handleJobPhotoUpload);
       qs('jobPhotoCameraInput').addEventListener('change', handleJobPhotoUpload);
