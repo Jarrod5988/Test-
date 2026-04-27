@@ -1,10 +1,12 @@
-const WATEROPS_CACHE = 'waterops-app-v2026-04-27-03';
+const WATEROPS_CACHE = 'waterops-app-v2026-04-27-04';
 const WATEROPS_CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './apple-touch-icon.png',
-  './icon-512.png'
+  './apple-touch-icon-dark.png',
+  './icon-512.png',
+  './icon-512-dark.png'
 ];
 const WATEROPS_CDN_ASSETS = [
   'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
