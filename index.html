@@ -9772,5 +9772,29 @@ async function savePdfReport() {
   <!-- Removed collapsible subcard script -->
 
   <!-- Theme toggle script removed as dark mode is no longer supported -->
+  <script>
+    (function registerWaterOpsServiceWorker() {
+      if (!('serviceWorker' in navigator)) return;
+      if (!/^https?:$/.test(window.location.protocol)) return;
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(function (registration) {
+            if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            registration.addEventListener('updatefound', function () {
+              var worker = registration.installing;
+              if (!worker) return;
+              worker.addEventListener('statechange', function () {
+                if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                  showAppToast('WaterOps update cached. Reopen the app to use the latest version.');
+                }
+              });
+            });
+          })
+          .catch(function (error) {
+            console.info('WaterOps offline cache unavailable', error);
+          });
+      });
+    })();
+  </script>
 </body>
 </html>
