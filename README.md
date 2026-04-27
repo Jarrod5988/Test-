@@ -7,16 +7,9 @@ WaterOps is a static PWA-style field app for pool testing, closed loop logging, 
 Recommended no-cost branded hosting setup:
 
 - Cloudflare Pages project name: `waterops`
-- App URL if available: `https://waterops.pages.dev`
-- GitHub repository source: `Jarrod5988/WaterOps`
+- App URL when deployed: `https://waterops.pages.dev`
 - Production branch: `main`
-- Build command: `exit 0`
+- Deploy command: `npx wrangler deploy`
 - Build output directory: `.`
 
-See `CLOUDFLARE_PAGES.md` for the full setup steps.
-
-## GitHub Pages fallback
-
-GitHub Pages can also host the app, but the default URL includes the GitHub username:
-
-https://jarrod5988.github.io/WaterOps/
+See `CLOUDFLARE_PAGES.md` for the Cloudflare setup and retry-build notes.
