@@ -306,11 +306,6 @@
       display: none;
     }
 
-    .button.training-toggle.active {
-      background: #fff0bf;
-      color: #684500;
-      border-color: rgba(176, 116, 0, 0.42);
-    }
 
     body.training-mode .card h2::after {
       content: 'Training';
@@ -1257,6 +1252,61 @@
       line-height: 1.1;
     }
 
+    .act-health-card {
+      grid-column: 1 / -1;
+    }
+
+    .act-health-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .act-health-row {
+      display: grid;
+      grid-template-columns: minmax(88px, 1fr) auto;
+      gap: 4px 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid rgba(0, 112, 192, 0.16);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.74);
+    }
+
+    .act-health-row span {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--primary-dark);
+    }
+
+    .act-health-row strong {
+      font-size: 13px;
+      color: var(--ink);
+      text-align: right;
+    }
+
+    .act-health-row small {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .act-health-row.good {
+      border-color: rgba(16, 140, 78, 0.28);
+      background: rgba(232, 250, 240, 0.78);
+    }
+
+    .act-health-row.warn {
+      border-color: rgba(209, 130, 0, 0.28);
+      background: rgba(255, 247, 225, 0.78);
+    }
+
+    .act-health-row.bad {
+      border-color: rgba(201, 68, 68, 0.3);
+      background: rgba(255, 236, 236, 0.82);
+    }
+
     .icebath-reference-note {
       display: none;
     }
@@ -2172,6 +2222,35 @@
       box-shadow: 0 8px 18px rgba(0, 122, 185, 0.10);
     }
 
+    .toolbar .button.training-toggle {
+      width: auto !important;
+      max-width: max-content;
+      min-height: 0 !important;
+      height: 30px;
+      padding: 4px 9px !important;
+      line-height: 1;
+      align-self: flex-start;
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+      box-shadow: none;
+      font-size: 12px;
+    }
+
+    .toolbar .button.training-toggle:hover,
+    .toolbar .button.training-toggle:focus {
+      background: rgba(0, 120, 180, 0.08);
+      border-color: rgba(0, 120, 180, 0.14);
+      color: #174f7c;
+      box-shadow: none;
+    }
+
+    .toolbar .button.training-toggle.active {
+      background: #fff0bf;
+      border-color: rgba(176, 116, 0, 0.36);
+      color: #684500;
+    }
+
     .app-tabs {
       padding: 8px;
       gap: 8px;
@@ -2344,7 +2423,7 @@
       <div class="toolbar">
         <button class="button ghost" id="resetBtn" type="button">Reset last test</button>
         <button class="button secondary" id="loadDefaultsBtn" type="button">Reload pool defaults</button>
-        <button class="button ghost training-toggle" id="trainingModeBtn" type="button" aria-pressed="false">Training mode off</button>
+        <button class="button ghost training-toggle" id="trainingModeBtn" type="button" aria-pressed="false" title="Toggle training mode">Training</button>
         <!-- Dark mode toggle removed -->
       </div>
       <div class="access-status" id="accessStatusBox">Access: setup unlocked until technician roles are loaded.</div>
@@ -3302,6 +3381,82 @@
       }
     ];
 
+    const ACT_HEALTH_POOL_GUIDE = {
+      sourceName: 'ACT Public Swimming Pool and Spa Pool Code of Practice - Part A',
+      sourceUrl: 'https://www.act.gov.au/business/licenses-and-inspections/public-swimming-and-spa-pools',
+      ph: { min: 7.2, max: 7.8 },
+      alkalinity: { min: 80, max: 200 },
+      totalChlorineMax: 10,
+      combinedChlorineMax: 1,
+      cyaOutdoorMax: 100
+    };
+
+    function getActHealthPoolProfile(pool, values = {}) {
+      const name = `${pool && pool.site ? pool.site : ''} ${pool && pool.poolName ? pool.poolName : ''}`.toLowerCase();
+      const temp = values.temp;
+      const cya = values.cya;
+      const hasCya = cya != null && cya > 0;
+      const isSpa = name.includes('spa') || name.includes('hot tub');
+      const isHydro = name.includes('hydrotherapy');
+      const isIndoor = name.includes('indoor') || isSpa || isHydro;
+      const isWarm = temp != null && temp >= 26;
+
+      if (isSpa) return { label: 'ACT public spa pool', freeChlorineMin: 2, cyaAllowed: false };
+      if (hasCya && isIndoor) return { label: 'ACT indoor/spa system with stabiliser recorded', freeChlorineMin: isWarm ? 2 : 1.5, cyaAllowed: false };
+      if (hasCya) return { label: isWarm ? 'ACT outdoor stabilised pool >=26 C' : 'ACT outdoor stabilised pool <26 C', freeChlorineMin: isWarm ? 4 : 3, cyaAllowed: true };
+      if (isIndoor) return { label: isWarm ? 'ACT indoor pool >=26 C' : 'ACT indoor pool <26 C', freeChlorineMin: isWarm ? 2 : 1.5, cyaAllowed: false };
+      return { label: 'ACT outdoor/non-stabilised pool', freeChlorineMin: 1, cyaAllowed: true };
+    }
+
+    function buildActHealthPoolCrossCheck() {
+      const pool = getSelectedPool();
+      const values = {
+        ph: n(inputs.ph && inputs.ph.value),
+        fc: n(inputs.freeChlorine && inputs.freeChlorine.value),
+        tc: n(inputs.totalChlorine && inputs.totalChlorine.value),
+        cc: n(inputs.combinedChlorine && inputs.combinedChlorine.value),
+        alk: n(inputs.alkalinity && inputs.alkalinity.value),
+        cya: n(inputs.cyanuricAcid && inputs.cyanuricAcid.value),
+        temp: n(inputs.temperature && inputs.temperature.value)
+      };
+      const profile = getActHealthPoolProfile(pool, values);
+      const rows = [];
+      const add = (label, value, note, tone) => rows.push({ label, value, note, tone });
+      const checkRange = (label, current, range, decimals = 0) => {
+        if (current == null) {
+          add(label, 'Not entered', `${formatNumber(range.min, decimals)}-${formatNumber(range.max, decimals)}`, 'info');
+          return;
+        }
+        const ok = current >= range.min && current <= range.max;
+        add(label, formatNumber(current, decimals), `${formatNumber(range.min, decimals)}-${formatNumber(range.max, decimals)}`, ok ? 'good' : 'bad');
+      };
+
+      if (values.fc == null) add('Free chlorine', 'Not entered', `ACT minimum ${formatNumber(profile.freeChlorineMin, 1)} ppm`, 'info');
+      else add('Free chlorine', formatNumber(values.fc, 2), `${profile.label}; minimum ${formatNumber(profile.freeChlorineMin, 1)} ppm`, values.fc >= profile.freeChlorineMin ? 'good' : 'bad');
+
+      checkRange('pH', values.ph, ACT_HEALTH_POOL_GUIDE.ph, 1);
+      checkRange('Alkalinity', values.alk, ACT_HEALTH_POOL_GUIDE.alkalinity, 0);
+
+      if (values.tc == null) add('Total chlorine', 'Not entered', `maximum ${formatNumber(ACT_HEALTH_POOL_GUIDE.totalChlorineMax, 0)} ppm`, 'info');
+      else add('Total chlorine', formatNumber(values.tc, 2), `maximum ${formatNumber(ACT_HEALTH_POOL_GUIDE.totalChlorineMax, 0)} ppm`, values.tc <= ACT_HEALTH_POOL_GUIDE.totalChlorineMax ? 'good' : 'bad');
+
+      if (values.cc == null) {
+        add('Combined chlorine', 'Not entered', `maximum ${formatNumber(ACT_HEALTH_POOL_GUIDE.combinedChlorineMax, 1)} ppm and <= half total chlorine`, 'info');
+      } else {
+        const ccOk = values.cc <= ACT_HEALTH_POOL_GUIDE.combinedChlorineMax && (values.tc == null || values.cc <= values.tc / 2);
+        add('Combined chlorine', formatNumber(values.cc, 2), `maximum ${formatNumber(ACT_HEALTH_POOL_GUIDE.combinedChlorineMax, 1)} ppm and <= half total chlorine`, ccOk ? 'good' : 'bad');
+      }
+
+      if (values.cya == null) {
+        add('CYA/stabiliser', 'Not entered', `outdoor max ${ACT_HEALTH_POOL_GUIDE.cyaOutdoorMax} ppm`, 'info');
+      } else if (!profile.cyaAllowed && values.cya > 0) {
+        add('CYA/stabiliser', formatNumber(values.cya, 0), 'ACT guide says isocyanurate is not used in indoor/spa systems', 'bad');
+      } else {
+        add('CYA/stabiliser', formatNumber(values.cya, 0), `outdoor max ${ACT_HEALTH_POOL_GUIDE.cyaOutdoorMax} ppm`, values.cya <= ACT_HEALTH_POOL_GUIDE.cyaOutdoorMax ? 'good' : 'bad');
+      }
+
+      return { profile, rows };
+    }
     const chemicalNames = {
       acid: 'Hydrochloric Acid 32%',
       chlorine: 'Liquid Chlorine 12.5%',
@@ -3358,7 +3513,7 @@
       if (button) {
         button.classList.toggle('active', enabled);
         button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-        button.textContent = enabled ? 'Training mode on' : 'Training mode off';
+        button.textContent = enabled ? 'Training on' : 'Training';
       }
       const banner = qs('trainingModeBanner');
       if (banner) banner.classList.toggle('hidden', !enabled);
@@ -3445,6 +3600,28 @@
     function roundDoseUp(value) {
       if (!Number.isFinite(value) || value <= 0) return 0;
       return Math.round(value);
+    }
+
+    function normaliseDoseQuantity(value, unit) {
+      if (!Number.isFinite(value) || value <= 0) return 0;
+      if (unit === 'kg') {
+        if (value < 1) return Math.max(0.001, round(Math.round(value * 1000) / 1000, 3));
+        return Math.round(value);
+      }
+      if (unit === 'L') {
+        if (value < 1) return Math.max(0.001, round(Math.round(value * 1000) / 1000, 3));
+        return Math.round(value);
+      }
+      return Math.round(value);
+    }
+
+    function normaliseChemicalDoses(doses) {
+      const next = {};
+      Object.keys(doses || {}).forEach(key => {
+        const unit = chemicalMeta[key] && chemicalMeta[key].unit;
+        next[key] = normaliseDoseQuantity(doses[key], unit);
+      });
+      return next;
     }
 
     function formatRecommendedDose(value, unit) {
@@ -3641,10 +3818,10 @@
         targetFc: defaults.fc,
         targetAlk: defaults.alk,
         targetCalcium: defaults.calcium ?? 200,
-        acid: acidDoseMl((pool && pool.volume) || 6000, values.ph, defaults.ph, values.alk),
-        chlorine: chlorineDoseMl((pool && pool.volume) || 6000, values.fc, defaults.fc),
-        bicarb: bicarbDoseKg((pool && pool.volume) || 6000, values.alk, defaults.alk),
-        calciumDose: calciumDoseKg((pool && pool.volume) || 6000, values.calcium, defaults.calcium ?? 200)
+        acid: normaliseDoseQuantity(acidDoseMl((pool && pool.volume) || 6000, values.ph, defaults.ph, values.alk), 'mL'),
+        chlorine: normaliseDoseQuantity(chlorineDoseMl((pool && pool.volume) || 6000, values.fc, defaults.fc), 'mL'),
+        bicarb: normaliseDoseQuantity(bicarbDoseKg((pool && pool.volume) || 6000, values.alk, defaults.alk), 'kg'),
+        calciumDose: normaliseDoseQuantity(calciumDoseKg((pool && pool.volume) || 6000, values.calcium, defaults.calcium ?? 200), 'kg')
       };
     }
 
@@ -4242,54 +4419,60 @@
       const pool = getSelectedPool();
       const ph = n(inputs.ph && inputs.ph.value);
       const fc = n(inputs.freeChlorine && inputs.freeChlorine.value);
+      const tc = n(inputs.totalChlorine && inputs.totalChlorine.value);
+      const cc = n(inputs.combinedChlorine && inputs.combinedChlorine.value);
       const cya = n(inputs.cyanuricAcid && inputs.cyanuricAcid.value);
       const alk = n(inputs.alkalinity && inputs.alkalinity.value);
       const calcium = n(inputs.calciumHardness && inputs.calciumHardness.value);
       const copper = n(inputs.copper && inputs.copper.value);
+      const temp = n(inputs.temperature && inputs.temperature.value);
       const clarity = inputs.waterClarity && inputs.waterClarity.value;
-      const name = `${pool.site || ''} ${pool.poolName || ''}`.toLowerCase();
-      const isSpaLike = name.includes('spa') || name.includes('hot tub') || name.includes('hydrotherapy');
-      const likelyOutdoor = !name.includes('indoor');
+      const profile = getActHealthPoolProfile(pool, { cya, temp });
       const alerts = [];
       const add = (tone, message) => alerts.push({ tone, message });
 
       if (fc == null) {
-        add('info', 'Add free chlorine to assess sanitiser risk. This is the highest-value reading for the next-service decision.');
-      } else if (fc < 1) {
-        add('bad', 'Free chlorine is below 1 ppm. Treat as a high-priority sanitiser risk before the pool is used.');
-      } else if (cya != null && cya > 0 && fc < 3) {
-        add('bad', 'Stabiliser/CYA is present and free chlorine is below 3 ppm. NSW guidance expects higher free chlorine when cyanurate is used.');
-      } else if (cya != null && cya > 0 && fc < 2) {
-        add('warn', 'CYA is present and free chlorine is below the CDC stabilised-pool minimum of 2 ppm.');
+        add('info', 'Add free chlorine to assess the ACT Health sanitiser cross-check.');
+      } else if (fc < profile.freeChlorineMin) {
+        add('bad', `Free chlorine is below the ACT guide minimum for ${profile.label} (${formatNumber(profile.freeChlorineMin, 1)} ppm). Treat as a high-priority sanitiser risk before the pool is used.`);
       } else {
-        add('good', 'Free chlorine is not showing an immediate low-sanitiser flag from the current reading.');
+        add('good', `Free chlorine meets the ACT guide minimum for ${profile.label}.`);
+      }
+
+      if (tc != null && tc > ACT_HEALTH_POOL_GUIDE.totalChlorineMax) {
+        add('bad', 'Total chlorine is above the ACT guide maximum of 10 ppm.');
+      }
+      if (cc != null && cc > ACT_HEALTH_POOL_GUIDE.combinedChlorineMax) {
+        add('bad', 'Combined chlorine is above the ACT guide maximum of 1.0 ppm.');
+      }
+      if (cc != null && tc != null && cc > tc / 2) {
+        add('bad', 'Combined chlorine is more than half of total chlorine, which fails the ACT guide cross-check.');
       }
 
       if (ph == null) {
         add('info', 'Add pH to assess disinfection efficiency, corrosion and swimmer comfort.');
-      } else if (ph > 7.8) {
-        add('bad', 'pH is above 7.8. Chlorine becomes less effective as pH rises, so correct pH before relying on the chlorine reading.');
-      } else if (ph < 7.0) {
-        add('bad', 'pH is below 7.0. That increases corrosion risk for pipework, heaters and metal components.');
+      } else if (ph > ACT_HEALTH_POOL_GUIDE.ph.max) {
+        add('bad', 'pH is above the ACT guide range of 7.2-7.8. Correct pH before relying on the chlorine reading.');
+      } else if (ph < ACT_HEALTH_POOL_GUIDE.ph.min) {
+        add('bad', 'pH is below the ACT guide range of 7.2-7.8. That increases corrosion risk for pipework, heaters and metal components.');
       } else if (ph >= 7.6) {
-        add('warn', 'pH is near the upper end of the useful range. Watch chlorine performance and scale tendency.');
+        add('warn', 'pH is inside the ACT guide range but near the upper end. Watch chlorine performance and scale tendency.');
       } else {
-        add('good', 'pH is inside the common 7.0-7.8 operating band.');
+        add('good', 'pH is inside the ACT guide range of 7.2-7.8.');
       }
 
       if (cya != null) {
-        if (isSpaLike && cya > 0) add('bad', 'Cyanuric acid/stabiliser is recorded for a spa-like system. NSW and CDC guidance says not to use CYA in spas/hot tubs.');
-        else if (cya > 50) add('bad', 'Cyanuric acid is above 50 mg/L. NSW guidance sets 50 mg/L as the upper limit because high CYA can slow disinfection.');
-        else if (cya >= 45) add('warn', 'Cyanuric acid is close to the 50 mg/L ceiling. Avoid stabilised chlorine until it drifts down.');
-        else if (cya > 0 && !likelyOutdoor) add('warn', 'CYA is recorded on a pool that may be indoor/enclosed. Stabiliser is normally for outdoor chlorine pools exposed to UV.');
+        if (!profile.cyaAllowed && cya > 0) add('bad', 'CYA/stabiliser is recorded for an indoor/spa-style system. The ACT guide says isocyanurate is not used in indoor swimming pools or public spa pools.');
+        else if (cya > ACT_HEALTH_POOL_GUIDE.cyaOutdoorMax) add('bad', 'CYA/stabiliser is above the ACT outdoor pool maximum of 100 ppm.');
+        else if (cya >= 80) add('warn', 'CYA/stabiliser is getting close to the ACT outdoor pool maximum of 100 ppm.');
       }
 
       if (clarity && /cloudy|poor/i.test(clarity)) {
         add('warn', `Water clarity is marked "${clarity}". Check filtration/turnover, combined chlorine risk, and whether the pool should stay out of service until clear.`);
       }
 
-      if (alk != null && alk < 60) add('warn', 'Alkalinity is low. Expect pH bounce and higher corrosion sensitivity.');
-      if (alk != null && alk > 180) add('warn', 'Alkalinity is high. Expect acid demand and possible scale/cloudiness issues.');
+      if (alk != null && alk < ACT_HEALTH_POOL_GUIDE.alkalinity.min) add('warn', 'Alkalinity is below the ACT guide range of 80-200 ppm. Expect pH bounce and higher corrosion sensitivity.');
+      if (alk != null && alk > ACT_HEALTH_POOL_GUIDE.alkalinity.max) add('warn', 'Alkalinity is above the ACT guide range of 80-200 ppm. Expect acid demand and possible scale/cloudiness issues.');
       if (calcium != null && calcium < 100) add('warn', 'Calcium hardness is low. Watch etching/corrosive-water risk in plaster and metal systems.');
       if (calcium != null && calcium > 400) add('warn', 'Calcium hardness is high. Watch scale risk, especially if pH or alkalinity is also high.');
       if (copper != null && copper >= 0.3) add('warn', 'Copper is elevated enough to watch staining and hair/fixture discolouration risk.');
@@ -7191,14 +7374,14 @@
         salt: n(inputs.targetSalt.value)
       };
 
-      const doses = {
+      const doses = normaliseChemicalDoses({
         acid: acidDoseMl(volume, current.ph, target.ph, current.alk),
         chlorine: chlorineDoseMl(volume, current.fc, target.fc),
         bicarb: bicarbDoseKg(volume, current.alk, target.alk),
         calcium: calciumDoseKg(volume, current.calcium, target.calcium),
         stabiliser: stabiliserDoseKg(volume, current.cya, target.cya),
         salt: saltDoseKg(volume, current.salt, target.salt)
-      };
+      });
 
       const ranges = {
         ph: getRecommendedRange('ph', target.ph),
@@ -7433,13 +7616,30 @@
       }
 
       if (referenceGrid) {
-        referenceGrid.innerHTML = rows.map(row => `
+        const actCheck = buildActHealthPoolCrossCheck();
+        const resultCards = rows.map(row => `
           <div class="icebath-reference-card">
             <strong>${escapeHtml(row.parameter)}</strong>
             <div class="icebath-reference-value">${row.current == null ? '-' : formatNumber(row.current, row.decimals)}</div>
             <div class="subtle">${escapeHtml(row.status.label)} - ${escapeHtml(row.rangeLabel || '-')}</div>
           </div>
         `).join('');
+        const actCards = `
+          <div class="icebath-reference-card act-health-card">
+            <strong>ACT Health cross-check</strong>
+            <div class="subtle">${escapeHtml(actCheck.profile.label)}. Based on ACT public swimming/spa pool guide; keep site-specific targets where stricter.</div>
+            <div class="act-health-list">
+              ${actCheck.rows.map(item => `
+                <div class="act-health-row ${escapeHtml(item.tone || 'info')}">
+                  <span>${escapeHtml(item.label)}</span>
+                  <strong>${escapeHtml(item.value)}</strong>
+                  <small>${escapeHtml(item.note)}</small>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        referenceGrid.innerHTML = resultCards + actCards;
       }
 
       const statuses = rows.map(row => row.status.label);
