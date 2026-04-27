@@ -1,4 +1,4 @@
-const WATEROPS_CACHE = 'waterops-app-v2026-04-27-12';
+const WATEROPS_CACHE = 'waterops-app-v2026-04-28-01';
 const WATEROPS_CORE_ASSETS = [
   './',
   './index.html',
