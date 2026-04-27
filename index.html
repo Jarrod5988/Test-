@@ -306,6 +306,75 @@
       display: none;
     }
 
+    .onsite-drum-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .onsite-drum-card {
+      border: 1px solid rgba(0, 120, 180, 0.18);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .onsite-drum-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .onsite-drum-head strong {
+      color: var(--ink);
+      font-size: 14px;
+    }
+
+    .drum-status {
+      border: 1px solid rgba(0, 120, 180, 0.16);
+      border-radius: 10px;
+      padding: 8px 10px;
+      margin-top: 10px;
+      background: #f4fbff;
+      color: #174f7c;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .drum-status.low {
+      border-color: rgba(201, 68, 68, 0.28);
+      background: #fff0f0;
+      color: #8f2020;
+    }
+
+    .drum-meter {
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(0, 120, 180, 0.12);
+      margin-top: 7px;
+    }
+
+    .drum-meter span {
+      display: block;
+      height: 100%;
+      width: var(--level, 0%);
+      border-radius: inherit;
+      background: linear-gradient(90deg, #19b8f0, #0076b4);
+    }
+
+    .drum-status.low .drum-meter span {
+      background: linear-gradient(90deg, #f97316, #dc2626);
+    }
+
+    @media (max-width: 640px) {
+      .onsite-drum-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
 
     body.training-mode .card h2::after {
       content: 'Training';
@@ -2818,6 +2887,12 @@
       </section>
 
 
+      <section class="card span-12" id="autoDosingDrumsCard">
+        <h2>Onsite dosing drums</h2>
+        <div class="mode-note">Record acid/chlorine drum levels for pools with onsite dosing systems. At 15% or lower, WaterOps can open a draft Hydroquip PO request for Leah.</div>
+        <div id="autoDosingDrumsContent"></div>
+      </section>
+
       <section class="card span-12" id="stockLogCard">
         <h2>Chemical stock used</h2>
         <div class="mode-note">Marked Dosed = Yes chemicals are automatically logged to stock used when you generate or save the service report.</div>
@@ -3213,6 +3288,7 @@
     const REPORT_BLUE_ACCENT = '#0059AD';
     const STORAGE_KEY = 'mbs-pool-dosing-combined-v3';
     const STOCK_STORAGE_KEY = 'mbs-pool-stock-v1';
+    const AUTO_DOSING_DRUM_STORAGE_KEY = 'mbs-auto-dosing-drums-v1';
     const COST_CENTRE_STORAGE_KEY = 'mbs-cost-centre-settings-v1';
     const DOSE_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium', 'stabiliser', 'salt'];
     const GROUP_ICE_DOSING_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium'];
@@ -6497,7 +6573,7 @@
       if (screen === 'insights') renderInsightsSection();
       if (screen === 'admin') renderQrSection();
       if (screen === 'costCentre') renderCostCentreSection();
-      if (screen === 'pools') { renderCombinedTable(); renderStockSection(); }
+      if (screen === 'pools') { renderCombinedTable(); renderAutoDosingDrumsSection(); renderStockSection(); }
       applyAccessControls();
     }
 
@@ -6541,6 +6617,211 @@
 
     function ensurePoolOnsiteStock(state, poolKey) {
       return state;
+    }
+
+    const ONSITE_DOSING_DRUMS = [
+      { key: 'acid', label: 'Hydrochloric Acid 32%', shortLabel: 'acid', supplier: 'Hydroquip', defaultContainerL: 15 },
+      { key: 'chlorine', label: 'Liquid Chlorine 12.5%', shortLabel: 'chlorine', supplier: 'Hydroquip', defaultContainerL: 15 }
+    ];
+
+    function getEmptyAutoDosingDrumState() {
+      return { leahEmail: '', pools: {} };
+    }
+
+    function loadAutoDosingDrumState() {
+      const state = loadJson(AUTO_DOSING_DRUM_STORAGE_KEY, getEmptyAutoDosingDrumState());
+      if (!state || typeof state !== 'object') return getEmptyAutoDosingDrumState();
+      if (!state.pools || typeof state.pools !== 'object') state.pools = {};
+      if (state.leahEmail == null) state.leahEmail = '';
+      return state;
+    }
+
+    function saveAutoDosingDrumState(state) {
+      saveJson(AUTO_DOSING_DRUM_STORAGE_KEY, state || getEmptyAutoDosingDrumState());
+    }
+
+    function getDefaultAutoDosingDrum(item) {
+      return {
+        applicable: false,
+        containerL: item.defaultContainerL || 15,
+        strength: '50',
+        remainingPercent: 100
+      };
+    }
+
+    function getAutoDosingDrumForPool(state, poolKey, item) {
+      const poolState = (state.pools && state.pools[poolKey]) || {};
+      return { ...getDefaultAutoDosingDrum(item), ...(poolState[item.key] || {}) };
+    }
+
+    function getStrengthLabel(item, strength) {
+      const product = item.shortLabel || item.label;
+      const value = String(strength || '50');
+      if (value === '100') return `100% ${product}`;
+      const water = Math.max(0, 100 - Number(value || 0));
+      return `${value}% ${product} / ${water}% water`;
+    }
+
+    function renderPercentOptions(selected) {
+      const current = String(selected ?? 100);
+      const values = [];
+      for (let value = 0; value <= 100; value += 5) values.push(value);
+      return values.map(value => `<option value="${value}" ${String(value) === current ? 'selected' : ''}>${value}%</option>`).join('');
+    }
+
+    function renderStrengthOptions(item, selected) {
+      return ['100', '75', '50', '25'].map(value => `<option value="${value}" ${String(selected || '50') === value ? 'selected' : ''}>${escapeHtml(getStrengthLabel(item, value))}</option>`).join('');
+    }
+
+    function getDrumLitresLeft(drum) {
+      const containerL = Number(drum.containerL || 0);
+      const remainingPercent = Number(drum.remainingPercent || 0);
+      if (!Number.isFinite(containerL) || containerL <= 0) return 0;
+      if (!Number.isFinite(remainingPercent) || remainingPercent <= 0) return 0;
+      return round(containerL * (remainingPercent / 100), 1);
+    }
+
+    function buildOnsiteDrumEmailDraft(item, drum) {
+      const pool = getSelectedPool();
+      const technician = (inputs.reportTechnician && inputs.reportTechnician.value) || getPreferredTechnicianName() || '';
+      const litresLeft = getDrumLitresLeft(drum);
+      const subject = `PO request - ${item.label} for ${pool.site || pool.poolName || 'site'}`;
+      const lines = [
+        'Hi Leah,',
+        '',
+        `Could you please raise a PO for ${item.label} for ${pool.site || pool.poolName || 'the site'} from ${item.supplier}?`,
+        '',
+        `Site: ${pool.site || '-'}`,
+        `Pool: ${pool.poolName || '-'}`,
+        `Chemical: ${item.label}`,
+        `Supplier: ${item.supplier}`,
+        `Container size: ${formatNumber(Number(drum.containerL || 0), 0)} L`,
+        `Mix strength: ${getStrengthLabel(item, drum.strength)}`,
+        `Remaining: ${formatNumber(Number(drum.remainingPercent || 0), 0)}% (${formatNumber(litresLeft, 1)} L left)`,
+        '',
+        'Thanks,',
+        technician || 'WaterOps'
+      ];
+      return { subject, body: lines.join('\n') };
+    }
+
+    function openOnsiteDrumPoEmail(chemicalKey) {
+      const state = loadAutoDosingDrumState();
+      const pool = getSelectedPool();
+      const item = ONSITE_DOSING_DRUMS.find(entry => entry.key === chemicalKey);
+      if (!item) return;
+      const drum = getAutoDosingDrumForPool(state, pool.key, item);
+      const leahEmail = String(state.leahEmail || '').trim();
+      if (!leahEmail) {
+        alert("Add Leah's PO email address first.");
+        qs('leahPoEmail')?.focus();
+        return;
+      }
+      const draft = buildOnsiteDrumEmailDraft(item, drum);
+      const mailto = `mailto:${encodeURIComponent(leahEmail)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
+      window.location.href = mailto;
+    }
+
+    function saveAutoDosingDrumField(event) {
+      if (isTrainingMode()) {
+        showAppToast('Training mode: onsite drum changes not saved.');
+        renderAutoDosingDrumsSection();
+        return;
+      }
+      const field = event.target;
+      const state = loadAutoDosingDrumState();
+      if (field.id === 'leahPoEmail') {
+        state.leahEmail = field.value.trim();
+      } else {
+        const pool = getSelectedPool();
+        const chemical = field.dataset.chemical;
+        const property = field.dataset.field;
+        const item = ONSITE_DOSING_DRUMS.find(entry => entry.key === chemical);
+        if (!chemical || !property || !item) return;
+        state.pools[pool.key] = state.pools[pool.key] || {};
+        const current = getAutoDosingDrumForPool(state, pool.key, item);
+        let value = field.value;
+        if (property === 'applicable') value = field.value === 'yes';
+        if (property === 'containerL') value = n(field.value) || 0;
+        if (property === 'remainingPercent') value = Number(field.value || 0);
+        state.pools[pool.key][chemical] = { ...current, [property]: value };
+      }
+      saveAutoDosingDrumState(state);
+      renderAutoDosingDrumsSection();
+    }
+
+    function renderAutoDosingDrumsSection() {
+      const wrap = qs('autoDosingDrumsContent');
+      if (!wrap) return;
+      if (isRaidersGroupMode()) {
+        wrap.innerHTML = '<div class="hint">Select a single pool to record onsite dosing drum levels.</div>';
+        return;
+      }
+      const pool = getSelectedPool();
+      const state = loadAutoDosingDrumState();
+      const disabled = isTrainingMode() ? 'disabled' : '';
+      const cards = ONSITE_DOSING_DRUMS.map(item => {
+        const drum = getAutoDosingDrumForPool(state, pool.key, item);
+        const litresLeft = getDrumLitresLeft(drum);
+        const low = drum.applicable && Number(drum.remainingPercent || 0) <= 15;
+        const status = !drum.applicable
+          ? 'Not used at this site.'
+          : `${formatNumber(Number(drum.remainingPercent || 0), 0)}% remaining, approx ${formatNumber(litresLeft, 1)} L left.`;
+        return `
+          <div class="onsite-drum-card">
+            <div class="onsite-drum-head">
+              <strong>${escapeHtml(item.label)}</strong>
+              <span class="metric-chip">${escapeHtml(item.supplier)}</span>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="drumApplicable_${item.key}">Onsite dosing system</label>
+                <select id="drumApplicable_${item.key}" class="onsite-drum-input" data-chemical="${item.key}" data-field="applicable" ${disabled}>
+                  <option value="no" ${drum.applicable ? '' : 'selected'}>Not applicable</option>
+                  <option value="yes" ${drum.applicable ? 'selected' : ''}>Yes</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="drumContainer_${item.key}">Container volume</label>
+                <input id="drumContainer_${item.key}" class="onsite-drum-input" data-chemical="${item.key}" data-field="containerL" type="number" min="0" step="1" inputmode="decimal" value="${escapeHtml(String(drum.containerL || ''))}" ${disabled} />
+                <small>Litres</small>
+              </div>
+              <div class="field">
+                <label for="drumStrength_${item.key}">Strength / mix</label>
+                <select id="drumStrength_${item.key}" class="onsite-drum-input" data-chemical="${item.key}" data-field="strength" ${disabled}>
+                  ${renderStrengthOptions(item, drum.strength)}
+                </select>
+              </div>
+              <div class="field">
+                <label for="drumRemaining_${item.key}">Amount left</label>
+                <select id="drumRemaining_${item.key}" class="onsite-drum-input" data-chemical="${item.key}" data-field="remainingPercent" ${disabled}>
+                  ${renderPercentOptions(drum.remainingPercent)}
+                </select>
+              </div>
+            </div>
+            <div class="drum-status ${low ? 'low' : ''}">
+              <strong>${low ? 'PO trigger reached' : 'Drum status'}</strong><br />
+              ${escapeHtml(status)}
+              <div class="drum-meter" style="--level:${Math.max(0, Math.min(100, Number(drum.remainingPercent || 0)))}%;"><span></span></div>
+              ${low ? `<div class="actions" style="margin-top: 10px;"><button class="button secondary onsite-po-email-btn" data-chemical="${item.key}" type="button">Open Hydroquip PO email draft</button></div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+      wrap.innerHTML = `
+        <div class="field" style="margin-bottom: 12px;">
+          <label for="leahPoEmail">Leah PO email</label>
+          <input id="leahPoEmail" type="email" inputmode="email" placeholder="leah@example.com" value="${escapeHtml(state.leahEmail || '')}" ${disabled} />
+          <small>Used only to open a draft email. The app does not send it.</small>
+        </div>
+        ${isTrainingMode() ? '<div class="hint" style="margin-bottom: 12px;">Training mode is on, so onsite drum changes are not saved.</div>' : ''}
+        <div class="onsite-drum-grid">${cards}</div>
+      `;
+      qs('leahPoEmail')?.addEventListener('change', saveAutoDosingDrumField);
+      wrap.querySelectorAll('.onsite-drum-input').forEach(field => field.addEventListener('change', saveAutoDosingDrumField));
+      wrap.querySelectorAll('.onsite-po-email-btn').forEach(button => {
+        button.addEventListener('click', () => openOnsiteDrumPoEmail(button.dataset.chemical));
+      });
     }
 
     function renderStockSection() {
@@ -9800,6 +10081,7 @@ async function savePdfReport() {
       renderQuickActions();
       restoreQuickActions();
       renderCombinedTable();
+      renderAutoDosingDrumsSection();
       renderStockSection();
       renderQrSection();
       renderClosedLoopTable();
@@ -9819,6 +10101,7 @@ async function savePdfReport() {
       syncCombinedChlorine();
       saveState();
       renderCombinedTable();
+      renderAutoDosingDrumsSection();
       renderStockSection();
       renderQrSection();
       renderPriorityAlerts();
@@ -9880,6 +10163,7 @@ async function savePdfReport() {
       renderQuickActions();
       restoreQuickActions();
       renderCombinedTable();
+      renderAutoDosingDrumsSection();
       renderStockSection();
       renderQrSection();
       renderPriorityAlerts();
