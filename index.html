@@ -3289,6 +3289,7 @@
     const STORAGE_KEY = 'mbs-pool-dosing-combined-v3';
     const STOCK_STORAGE_KEY = 'mbs-pool-stock-v1';
     const AUTO_DOSING_DRUM_STORAGE_KEY = 'mbs-auto-dosing-drums-v1';
+    const DEFAULT_LEAH_PO_EMAIL = 'leahm@mbsfm.com.au';
     const COST_CENTRE_STORAGE_KEY = 'mbs-cost-centre-settings-v1';
     const DOSE_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium', 'stabiliser', 'salt'];
     const GROUP_ICE_DOSING_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium'];
@@ -6625,14 +6626,14 @@
     ];
 
     function getEmptyAutoDosingDrumState() {
-      return { leahEmail: '', pools: {} };
+      return { leahEmail: DEFAULT_LEAH_PO_EMAIL, pools: {} };
     }
 
     function loadAutoDosingDrumState() {
       const state = loadJson(AUTO_DOSING_DRUM_STORAGE_KEY, getEmptyAutoDosingDrumState());
       if (!state || typeof state !== 'object') return getEmptyAutoDosingDrumState();
       if (!state.pools || typeof state.pools !== 'object') state.pools = {};
-      if (state.leahEmail == null) state.leahEmail = '';
+      if (!state.leahEmail) state.leahEmail = DEFAULT_LEAH_PO_EMAIL;
       return state;
     }
 
@@ -6771,7 +6772,6 @@
           <div class="onsite-drum-card">
             <div class="onsite-drum-head">
               <strong>${escapeHtml(item.label)}</strong>
-              <span class="metric-chip">${escapeHtml(item.supplier)}</span>
             </div>
             <div class="field-grid">
               <div class="field">
@@ -6811,8 +6811,8 @@
       wrap.innerHTML = `
         <div class="field" style="margin-bottom: 12px;">
           <label for="leahPoEmail">Leah PO email</label>
-          <input id="leahPoEmail" type="email" inputmode="email" placeholder="leah@example.com" value="${escapeHtml(state.leahEmail || '')}" ${disabled} />
-          <small>Used only to open a draft email. The app does not send it.</small>
+          <input id="leahPoEmail" type="email" inputmode="email" placeholder="leahm@mbsfm.com.au" value="${escapeHtml(state.leahEmail || DEFAULT_LEAH_PO_EMAIL)}" ${disabled} />
+          <small>Used only to open a draft email. Your phone/browser chooses the email app; if prompted, choose Always to make it the default.</small>
         </div>
         ${isTrainingMode() ? '<div class="hint" style="margin-bottom: 12px;">Training mode is on, so onsite drum changes are not saved.</div>' : ''}
         <div class="onsite-drum-grid">${cards}</div>
