@@ -6446,8 +6446,16 @@
     }
 
     async function saveClosedLoopPdfReport() {
-      if (!renderClosedLoopReport()) return;
+      if (isIosSaveEnvironment()) {
+        showPdfPreparingPanel('Building the closed loop report PDF now. The save options will appear here when it is ready.');
+        await waitForBrowserPaint();
+      }
+      if (!renderClosedLoopReport()) {
+        removePdfSavePanel();
+        return;
+      }
       if (!window.jspdf || !window.jspdf.jsPDF) {
+        removePdfSavePanel();
         alert('PDF library did not load. Please refresh and try again.');
         return;
       }
@@ -8870,6 +8878,27 @@ function buildReportHtml() {
       }
     }
 
+    function waitForBrowserPaint() {
+      return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    }
+
+    function showPdfPreparingPanel(message = 'Preparing PDF...') {
+      removePdfSavePanel();
+      const panel = document.createElement('div');
+      panel.id = 'pdfSavePanel';
+      panel.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.42);display:flex;align-items:flex-end;justify-content:center;padding:16px;';
+      panel.innerHTML = `
+        <div style="width:min(420px,100%);background:#fff;border:1px solid #b8d8ef;border-radius:14px;box-shadow:0 20px 50px rgba(15,23,42,.28);padding:16px;color:#12395c;">
+          <div style="font-weight:800;font-size:1.05rem;margin-bottom:6px;">Preparing PDF</div>
+          <div style="font-size:.9rem;line-height:1.45;color:#496886;margin-bottom:12px;">${escapeHtml(message)}</div>
+          <div style="height:8px;background:#e4f4fd;border-radius:99px;overflow:hidden;"><div style="height:100%;width:45%;background:#00a9e8;border-radius:99px;"></div></div>
+          <div style="font-size:.78rem;color:#6b7f94;margin-top:10px;">Keep this open. The save options will appear here when the PDF is ready.</div>
+        </div>
+      `;
+      document.body.appendChild(panel);
+      return panel;
+    }
+
     function showPdfSavePanel(blob, filename, mimeType) {
       removePdfSavePanel();
       const url = URL.createObjectURL(blob);
@@ -8995,8 +9024,13 @@ function drawTable(doc, startX, startY, columnWidths, headers, rows, options = {
 
 
 async function savePdfReport() {
+      if (isIosSaveEnvironment()) {
+        showPdfPreparingPanel('Building the service report PDF now. This should appear straight away, even if the PDF takes a moment to finish.');
+        await waitForBrowserPaint();
+      }
       renderReport();
       if (!window.jspdf || !window.jspdf.jsPDF) {
+        removePdfSavePanel();
         alert('PDF library did not load. Please refresh and try again.');
         return;
       }
