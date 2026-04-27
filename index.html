@@ -6639,7 +6639,7 @@
     ];
 
     function getEmptyAutoDosingDrumState() {
-      return { leahEmail: DEFAULT_LEAH_PO_EMAIL, pools: {} };
+      return { leahEmail: DEFAULT_LEAH_PO_EMAIL, emailMethod: 'mail', pools: {} };
     }
 
     function loadAutoDosingDrumState() {
@@ -6647,6 +6647,7 @@
       if (!state || typeof state !== 'object') return getEmptyAutoDosingDrumState();
       if (!state.pools || typeof state.pools !== 'object') state.pools = {};
       if (!state.leahEmail || /@example\.com$/i.test(String(state.leahEmail))) state.leahEmail = DEFAULT_LEAH_PO_EMAIL;
+      if (!['mail', 'copy'].includes(state.emailMethod)) state.emailMethod = 'mail';
       return state;
     }
 
@@ -6659,6 +6660,7 @@
         applicable: false,
         containerL: item.defaultContainerL || 15,
         supplier: item.supplier || ONSITE_PO_SUPPLIERS[0],
+        orderDrums: 1,
         strength: '50',
         remainingPercent: 100
       };
@@ -6689,6 +6691,11 @@
       return ONSITE_PO_SUPPLIERS.map(name => `<option value="${escapeHtml(name)}" ${name === current ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
     }
 
+    function renderDrumCountOptions(selected) {
+      const current = Math.max(1, Math.min(5, Number(selected || 1)));
+      return [1, 2, 3, 4, 5].map(value => `<option value="${value}" ${value === current ? 'selected' : ''}>${value} ${value === 1 ? 'drum' : 'drums'}</option>`).join('');
+    }
+
     function renderStrengthOptions(item, selected) {
       return ['100', '75', '50', '25'].map(value => `<option value="${value}" ${String(selected || '50') === value ? 'selected' : ''}>${escapeHtml(getStrengthLabel(item, value))}</option>`).join('');
     }
@@ -6701,31 +6708,68 @@
       return round(containerL * (remainingPercent / 100), 1);
     }
 
-    function buildOnsiteDrumEmailDraft(item, drum) {
+    function getLowOnsitePoItems(state, pool) {
+      if (!pool || !pool.key) return [];
+      return ONSITE_DOSING_DRUMS.map(item => {
+        const drum = getAutoDosingDrumForPool(state, pool.key, item);
+        const low = drum.applicable && Number(drum.remainingPercent || 0) <= 15;
+        return low ? { item, drum } : null;
+      }).filter(Boolean);
+    }
+
+    function buildOnsiteDrumEmailDraftForItems(entries) {
       const pool = getSelectedPool();
       const technician = (inputs.reportTechnician && inputs.reportTechnician.value) || getPreferredTechnicianName() || '';
-      const litresLeft = getDrumLitresLeft(drum);
       const simproJob = getSimproJobNumber();
-      const supplier = drum.supplier || item.supplier || ONSITE_PO_SUPPLIERS[0];
-      const subject = `Purchase order request - ${item.label} for ${pool.site || pool.poolName || 'site'}${simproJob ? ` - Simpro ${simproJob}` : ''}`;
+      const validEntries = (entries || []).filter(entry => entry && entry.item && entry.drum);
+      const siteName = pool.site || pool.poolName || 'site';
+      const chemicalNames = validEntries.map(entry => entry.item.label);
+      const subjectLabel = validEntries.length > 1 ? `${siteName} - ${validEntries.length} chemicals` : `${chemicalNames[0] || 'onsite chemical'} for ${siteName}`;
       const lines = [
         'Hi Leah,',
         '',
-        `Could you please raise a purchase order request for ${item.label} at ${pool.site || pool.poolName || 'the site'}?`,
+        `Could you please raise a purchase order request for ${validEntries.length > 1 ? 'the following onsite dosing chemicals' : chemicalNames[0] || 'the onsite dosing chemical'} at ${siteName}?`,
         '',
         `Site: ${pool.site || '-'}`,
         `Pool: ${pool.poolName || '-'}`,
         `Simpro job #: ${simproJob || '-'}`,
-        `Chemical: ${item.label}`,
-        `Supplier: ${supplier}`,
-        `Container size: ${formatNumber(Number(drum.containerL || 0), 0)} L`,
-        `Mix strength: ${getStrengthLabel(item, drum.strength)}`,
-        `Remaining: ${formatNumber(Number(drum.remainingPercent || 0), 0)}% (${formatNumber(litresLeft, 1)} L left)`,
-        '',
-        'Thanks,',
-        technician || 'WaterOps'
+        ''
       ];
-      return { subject, body: lines.join('\n') };
+      validEntries.forEach((entry, index) => {
+        const { item, drum } = entry;
+        const litresLeft = getDrumLitresLeft(drum);
+        const supplier = drum.supplier || item.supplier || ONSITE_PO_SUPPLIERS[0];
+        const orderDrums = Math.max(1, Math.min(5, Number(drum.orderDrums || 1)));
+        if (validEntries.length > 1) lines.push(`Item ${index + 1}`);
+        lines.push(
+          `Chemical: ${item.label}`,
+          `Supplier: ${supplier}`,
+          `Drums requested: ${orderDrums}`,
+          `Container size: ${formatNumber(Number(drum.containerL || 0), 0)} L each`,
+          `Mix strength: ${getStrengthLabel(item, drum.strength)}`,
+          `Remaining: ${formatNumber(Number(drum.remainingPercent || 0), 0)}% (${formatNumber(litresLeft, 1)} L left)`
+        );
+        if (index < validEntries.length - 1) lines.push('');
+      });
+      lines.push('', 'Thanks,', technician || 'WaterOps');
+      return { subject: `Purchase order request - ${subjectLabel}${simproJob ? ` - Simpro ${simproJob}` : ''}`, body: lines.join('\n') };
+    }
+
+    function buildOnsiteDrumEmailDraft(item, drum) {
+      return buildOnsiteDrumEmailDraftForItems([{ item, drum }]);
+    }
+
+    function copyOnsiteDrumPoDraft(leahEmail, draft) {
+      const text = `To: ${leahEmail}\nSubject: ${draft.subject}\n\n${draft.body}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showAppToast('PO email draft copied. Paste it into Apple Mail.');
+        }).catch(() => {
+          window.prompt('Copy this PO email draft', text);
+        });
+        return;
+      }
+      window.prompt('Copy this PO email draft', text);
     }
 
     function openOnsiteDrumPoEmail(chemicalKey) {
@@ -6740,7 +6784,13 @@
         qs('leahPoEmail')?.focus();
         return;
       }
-      const draft = buildOnsiteDrumEmailDraft(item, drum);
+      const lowEntries = getLowOnsitePoItems(state, pool);
+      const entries = lowEntries.length ? lowEntries : [{ item, drum }];
+      const draft = buildOnsiteDrumEmailDraftForItems(entries);
+      if (state.emailMethod === 'copy') {
+        copyOnsiteDrumPoDraft(leahEmail, draft);
+        return;
+      }
       const mailto = `mailto:${encodeURIComponent(leahEmail)}?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(draft.body)}`;
       window.location.href = mailto;
     }
@@ -6755,6 +6805,8 @@
       const state = loadAutoDosingDrumState();
       if (field.id === 'leahPoEmail') {
         state.leahEmail = field.value.trim();
+      } else if (field.id === 'poEmailMethod') {
+        state.emailMethod = ['mail', 'copy'].includes(field.value) ? field.value : 'mail';
       } else {
         const pool = getSelectedPool();
         const chemical = field.dataset.chemical;
@@ -6767,6 +6819,7 @@
         if (property === 'applicable') value = field.value === 'yes';
         if (property === 'containerL') value = n(field.value) || 0;
         if (property === 'remainingPercent') value = Number(field.value || 0);
+        if (property === 'orderDrums') value = Math.max(1, Math.min(5, Number(field.value || 1)));
         state.pools[pool.key][chemical] = { ...current, [property]: value };
       }
       saveAutoDosingDrumState(state);
@@ -6783,10 +6836,12 @@
       const pool = getSelectedPool();
       const state = loadAutoDosingDrumState();
       const disabled = isTrainingMode() ? 'disabled' : '';
+      const lowEntries = getLowOnsitePoItems(state, pool);
       const cards = ONSITE_DOSING_DRUMS.map(item => {
         const drum = getAutoDosingDrumForPool(state, pool.key, item);
         const litresLeft = getDrumLitresLeft(drum);
         const low = drum.applicable && Number(drum.remainingPercent || 0) <= 15;
+        const combinedLow = low && lowEntries.length > 1;
         const status = !drum.applicable
           ? 'Not used at this site.'
           : `${formatNumber(Number(drum.remainingPercent || 0), 0)}% remaining, approx ${formatNumber(litresLeft, 1)} L left.`;
@@ -6815,6 +6870,12 @@
                 </select>
               </div>
               <div class="field">
+                <label for="drumOrder_${item.key}">Drums to order</label>
+                <select id="drumOrder_${item.key}" class="onsite-drum-input" data-chemical="${item.key}" data-field="orderDrums" ${disabled}>
+                  ${renderDrumCountOptions(drum.orderDrums)}
+                </select>
+              </div>
+              <div class="field">
                 <label for="drumStrength_${item.key}">Strength / mix</label>
                 <select id="drumStrength_${item.key}" class="onsite-drum-input" data-chemical="${item.key}" data-field="strength" ${disabled}>
                   ${renderStrengthOptions(item, drum.strength)}
@@ -6831,27 +6892,38 @@
               <strong>${low ? 'PO trigger reached' : 'Drum status'}</strong><br />
               ${escapeHtml(status)}
               <div class="drum-meter" style="--level:${Math.max(0, Math.min(100, Number(drum.remainingPercent || 0)))}%;"><span></span></div>
-              ${low ? `<div class="actions" style="margin-top: 10px;"><button class="button secondary onsite-po-email-btn" data-chemical="${item.key}" type="button">Open Mail app purchase order request</button></div>` : ''}
+              ${combinedLow ? `<div class="mode-note" style="margin-top: 8px;">This will include ${lowEntries.length} low drum items in one email.</div>` : ''}
+              ${low ? `<div class="actions" style="margin-top: 10px;"><button class="button secondary onsite-po-email-btn" data-chemical="${item.key}" type="button">${combinedLow ? 'Open combined purchase order request' : 'Open purchase order request'}</button></div>` : ''}
             </div>
           </div>
         `;
       }).join('');
       wrap.innerHTML = `
-        <div class="field" style="margin-bottom: 12px;">
-          <label for="leahPoEmail">Leah PO email</label>
-          <input id="leahPoEmail" type="email" inputmode="email" placeholder="leahm@mbsfm.com.au" value="${escapeHtml(state.leahEmail || DEFAULT_LEAH_PO_EMAIL)}" ${disabled} />
-          <small>Opens a draft in the device Mail app/default email app. If your phone asks which app to use, choose Mail and Always.</small>
+        <div class="field-grid" style="margin-bottom: 12px;">
+          <div class="field">
+            <label for="leahPoEmail">Leah PO email</label>
+            <input id="leahPoEmail" type="email" inputmode="email" placeholder="leahm@mbsfm.com.au" value="${escapeHtml(state.leahEmail || DEFAULT_LEAH_PO_EMAIL)}" ${disabled} />
+            <small>Used for the purchase order request draft.</small>
+          </div>
+          <div class="field">
+            <label for="poEmailMethod">PO email action</label>
+            <select id="poEmailMethod" ${disabled}>
+              <option value="mail" ${state.emailMethod === 'mail' ? 'selected' : ''}>Open default Mail app</option>
+              <option value="copy" ${state.emailMethod === 'copy' ? 'selected' : ''}>Copy draft only</option>
+            </select>
+            <small>iPhone chooses the app for email drafts. Set Apple Mail as the default mail app if Outlook opens.</small>
+          </div>
         </div>
         ${isTrainingMode() ? '<div class="hint" style="margin-bottom: 12px;">Training mode is on, so onsite drum changes are not saved.</div>' : ''}
         <div class="onsite-drum-grid">${cards}</div>
       `;
       qs('leahPoEmail')?.addEventListener('change', saveAutoDosingDrumField);
+      qs('poEmailMethod')?.addEventListener('change', saveAutoDosingDrumField);
       wrap.querySelectorAll('.onsite-drum-input').forEach(field => field.addEventListener('change', saveAutoDosingDrumField));
       wrap.querySelectorAll('.onsite-po-email-btn').forEach(button => {
         button.addEventListener('click', () => openOnsiteDrumPoEmail(button.dataset.chemical));
       });
     }
-
     function renderStockSection() {
       const wrap = qs('stockContent');
       if (!wrap) return;
