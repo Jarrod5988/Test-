@@ -2590,6 +2590,10 @@
             <input id="reportPoolName" type="text" placeholder="Auto-filled from pool selection" />
           </div>
           <div class="field">
+            <label for="simproJobNumber">Simpro job #</label>
+            <input id="simproJobNumber" type="text" inputmode="text" placeholder="Optional job number" />
+          </div>
+          <div class="field">
             <label for="reportTechnician">Technician</label>
             <select id="reportTechnician">
               <option value="">Select technician</option>
@@ -3734,6 +3738,13 @@
 
     function getSelectedPool() {
       return POOLS.find(pool => pool.key === inputs.poolSelect.value) || POOLS[0];
+    }
+
+    function getSimproJobNumber() {
+      const primary = (inputs.simproJobNumber && inputs.simproJobNumber.value ? inputs.simproJobNumber.value : '').trim();
+      if (primary) return primary;
+      const costField = qs('costReportJobRef');
+      return costField && costField.value ? costField.value.trim() : '';
     }
 
     function getCostCentrePool() {
@@ -6686,7 +6697,8 @@
       const pool = getSelectedPool();
       const technician = (inputs.reportTechnician && inputs.reportTechnician.value) || getPreferredTechnicianName() || '';
       const litresLeft = getDrumLitresLeft(drum);
-      const subject = `PO request - ${item.label} for ${pool.site || pool.poolName || 'site'}`;
+      const simproJob = getSimproJobNumber();
+      const subject = `PO request - ${item.label} for ${pool.site || pool.poolName || 'site'}${simproJob ? ` - Simpro ${simproJob}` : ''}`;
       const lines = [
         'Hi Leah,',
         '',
@@ -6694,6 +6706,7 @@
         '',
         `Site: ${pool.site || '-'}`,
         `Pool: ${pool.poolName || '-'}`,
+        `Simpro job #: ${simproJob || '-'}`,
         `Chemical: ${item.label}`,
         `Supplier: ${item.supplier}`,
         `Container size: ${formatNumber(Number(drum.containerL || 0), 0)} L`,
@@ -7025,7 +7038,7 @@
       return {
         costCentre: (qs('costCentreCode')?.value || '').trim(),
         supervisor: (qs('costReportSupervisor')?.value || '').trim(),
-        jobRef: (qs('costReportJobRef')?.value || '').trim(),
+        jobRef: ((qs('costReportJobRef')?.value || '').trim() || getSimproJobNumber()),
         notes: (qs('costReportNotes')?.value || '').trim(),
         rates
       };
@@ -7035,7 +7048,7 @@
       const settings = getCurrentPoolCostSettings();
       if (qs('costCentreCode')) qs('costCentreCode').value = settings.costCentre || '';
       if (qs('costReportSupervisor')) qs('costReportSupervisor').value = settings.supervisor || '';
-      if (qs('costReportJobRef')) qs('costReportJobRef').value = settings.jobRef || '';
+      if (qs('costReportJobRef')) qs('costReportJobRef').value = settings.jobRef || getSimproJobNumber() || '';
       if (qs('costReportNotes')) qs('costReportNotes').value = settings.notes || '';
       DOSE_KEYS.forEach(key => {
         const field = qs(`costRate_${key}`);
@@ -7094,7 +7107,8 @@
 
     function buildCostCentreReportModel() {
       const pool = getCostCentrePool();
-      const settings = readCostCentreForm();
+      const settings = { ...readCostCentreForm() };
+      if (!settings.jobRef) settings.jobRef = getSimproJobNumber();
       const transactions = (loadStockState().transactions || []).filter(tx => tx.poolKey === pool.key);
       let pricedTotal = 0;
       const rows = transactions.map(tx => {
@@ -8318,6 +8332,7 @@
         combinedChlorine: rows.find(row => row.parameter === 'Combined chlorine')
       };
 
+      const simproJob = getSimproJobNumber();
       const summaryItems = [
         { label: 'Water Clarity', value: inputs.waterClarity.value || '-' },
         { label: 'Volume (L)', value: formatNumber(volume, 0) },
@@ -8385,6 +8400,7 @@
         companyLines: ['63 Tennant Street', 'Fyshwick ACT 2609', '(02) 6162 0216', 'info@mbsfm.com.au'],
         site: inputs.reportSite.value || '-',
         poolName: inputs.reportPoolName.value || '-',
+        simproJob: simproJob || '-',
         technician: inputs.reportTechnician.value || '-',
         date: formatDateDisplay(inputs.reportDate.value || ''),
         testTime: formatTimeDisplay(inputs.testTime.value || ''),
@@ -8409,6 +8425,7 @@
       lines.push(`Technician: ${model.technician}`);
       lines.push(`Date: ${model.date}`);
       lines.push(`Test time: ${model.testTime}`);
+      lines.push(`Simpro job #: ${model.simproJob || '-'}`);
       lines.push('');
       lines.push('Water Summary');
       lines.push(model.summaryItems.map(item => `${item.label}: ${item.value}`).join(' | '));
@@ -8464,6 +8481,10 @@ function buildReportHtml() {
                     <span class="value">${escapeHtml(model.poolName)}</span>
                   </div>
                   <div class="report-meta-item">
+                    <span class="label">Simpro job #</span>
+                    <span class="value">${escapeHtml(model.simproJob || '-')}</span>
+                  </div>
+                  <div class="report-meta-item">
                     <span class="label">Date</span>
                     <span class="value">${escapeHtml(model.date)}</span>
                   </div>
@@ -8482,8 +8503,12 @@ function buildReportHtml() {
               <tr>
                 <th style="width:22%;">Tested asset</th>
                 <td style="width:28%;">${escapeHtml(model.poolName)}</td>
-                <th style="width:22%;">Water clarity</th>
-                <td style="width:28%;">${escapeHtml(inputs.waterClarity.value || '-')}</td>
+                <th style="width:22%;">Simpro job #</th>
+                <td style="width:28%;">${escapeHtml(model.simproJob || '-')}</td>
+              </tr>
+              <tr>
+                <th>Water clarity</th>
+                <td colspan="3">${escapeHtml(inputs.waterClarity.value || '-')}</td>
               </tr>
             </tbody>
           </table>
@@ -9061,7 +9086,8 @@ async function savePdfReport() {
         ['Technician', model.technician, cardX + 41, cardY + 12],
         ['Pool / Spa', model.poolName, cardX + 4, cardY + 22],
         ['Date', model.date, cardX + 41, cardY + 22],
-        ['Test time', model.testTime, cardX + 4, cardY + 30.5]
+        ['Test time', model.testTime, cardX + 4, cardY + 30.5],
+        ['Simpro job #', model.simproJob || '-', cardX + 41, cardY + 30.5]
       ];
       metaItems.forEach(([label, value, x, y]) => {
         doc.setFont('helvetica', 'bold');
@@ -10129,7 +10155,7 @@ async function savePdfReport() {
 
     function init() {
       [
-        'reportSite', 'reportPoolName', 'reportTechnician', 'reportDate', 'testTime', 'waterClarity',
+        'reportSite', 'reportPoolName', 'simproJobNumber', 'reportTechnician', 'reportDate', 'testTime', 'waterClarity',
         'serviceNotes', 'poolSelect', 'poolVolumeAuto', 'customVolume', 'activeVolume',
         'ph', 'targetPh', 'freeChlorine', 'targetFreeChlorine', 'totalChlorine', 'combinedChlorine', 'alkalinity', 'targetAlkalinity',
         'calciumHardness', 'targetCalcium', 'cyanuricAcid', 'targetCya', 'salt', 'targetSalt',
