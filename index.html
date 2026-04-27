@@ -6534,11 +6534,11 @@
 
       const filenameBase = (model.systemName || 'closed-loop-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'closed-loop-report'}-${inputs.closedDate.value || 'report'}.pdf`;
-      await updateLiveMasterSheet(buildClosedLoopSheetPayload());
       const blob = doc.output('blob');
       await saveBlob(blob, filename, 'application/pdf');
       // Automatically record a closed loop visit snapshot whenever a PDF is saved.
       saveClosedLoopSnapshot();
+      await updateLiveMasterSheet(buildClosedLoopSheetPayload());
     }
 
     function saveClosedLoopSnapshot() {
@@ -9129,11 +9129,11 @@ async function savePdfReport() {
         await appendJobPhotosToPdf(doc, { attachments: jobPhotoAttachments, blue, borderBlue, margin });
         const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
-        await updateLiveMasterSheetBatch(buildRaidersGroupSheetPayloads());
         const blob = doc.output('blob');
         await saveBlob(blob, filename, 'application/pdf');
         // Automatically save a snapshot for each Raiders ice bath when generating a group report.
         saveRaidersGroupSnapshots();
+        await updateLiveMasterSheetBatch(buildRaidersGroupSheetPayloads());
         return;
       }
 
@@ -9310,11 +9310,11 @@ async function savePdfReport() {
       await appendJobPhotosToPdf(doc, { attachments: jobPhotoAttachments, blue, borderBlue, margin });
       const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
-      await updateLiveMasterSheet(buildPoolSheetPayload());
       const blob = doc.output('blob');
       await saveBlob(blob, filename, 'application/pdf');
       // Also store a visit snapshot for the selected pool whenever a PDF is saved.
       savePoolVisitSnapshot();
+      await updateLiveMasterSheet(buildPoolSheetPayload());
     }
 
 
