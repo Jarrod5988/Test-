@@ -3407,6 +3407,12 @@
       return POOLS.find(pool => pool.key === inputs.poolSelect.value) || POOLS[0];
     }
 
+    function getCostCentrePool() {
+      const selector = qs('costCentrePoolSelect');
+      const key = selector && selector.value ? selector.value : getSelectedPool().key;
+      return POOLS.find(pool => pool.key === key) || getSelectedPool() || POOLS[0];
+    }
+
     function getActiveVolume() {
       const custom = n(inputs.customVolume.value);
       const auto = n(inputs.poolVolumeAuto.value);
@@ -4966,7 +4972,7 @@
         stock,
         costSettings: getCostSettingsState(),
         projection: buildCostProjectionModel(),
-        selectedPool: getPoolSyncDetails(),
+        selectedPool: getPoolSyncDetails(getCostCentrePool()),
         capturedAt: new Date().toISOString()
       };
     }
@@ -6403,12 +6409,18 @@
       if (!wrap) return;
       const canEditCosts = isAdminUnlocked();
       const costEditAttr = canEditCosts ? '' : 'disabled';
+      const selectedCostPool = getCostCentrePool();
+      const costPoolOptions = POOLS.map(pool => {
+        const label = pool.selectLabel || `${pool.site ? `${pool.site} - ` : ''}${pool.poolName}`;
+        return `<option value="${escapeHtml(pool.key)}" ${pool.key === selectedCostPool.key ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      }).join('');
       wrap.innerHTML = `
         <div class="subcard" style="margin-top: 12px;">
           <h3 style="margin-bottom: 10px;">Site costs report</h3>
-          <div class="mode-note" style="margin-bottom: 10px;">Supervisor costing area. Uses the saved chemical stock used log for the selected pool. Add rates to calculate reports, ongoing costs and future quote estimates.</div>
-          ${canEditCosts ? '' : '<div class="hint" style="margin-bottom: 10px;">Cost rates and saved settings are admin-only. You can still generate reports from saved rates.</div>'}
+          <div class="mode-note" style="margin-bottom: 10px;">Supervisor costing area. Select the pool/site cost profile, then save agreed rates for that pool. Reports use the saved chemical stock used log for the selected pool.</div>
+          ${canEditCosts ? '' : '<div class="hint" style="margin-bottom: 10px;">Cost rates and saved settings are admin-only. You can still select a pool and generate reports from saved rates.</div>'}
           <div class="asset-form-grid">
+            <div class="field" style="grid-column: 1 / -1;"><label for="costCentrePoolSelect">Pool / site cost profile</label><select id="costCentrePoolSelect">${costPoolOptions}</select><small>Each pool can have its own agreed chemical rates and job code.</small></div>
             <div class="field"><label for="costCentreCode">Site cost / job code</label><input id="costCentreCode" type="text" placeholder="e.g. CC-4021 / WO-12345" ${costEditAttr} /></div>
             <div class="field"><label for="costReportSupervisor">Supervisor</label><input id="costReportSupervisor" type="text" placeholder="Supervisor name" ${costEditAttr} /></div>
             <div class="field"><label for="costReportJobRef">Job reference</label><input id="costReportJobRef" type="text" placeholder="Optional work order" ${costEditAttr} /></div>
@@ -6444,7 +6456,7 @@
     }
 
     function getCurrentPoolCostSettings() {
-      const pool = getSelectedPool();
+      const pool = getCostCentrePool();
       const state = getCostSettingsState();
       return state[pool.key] || { rates: {} };
     }
@@ -6483,7 +6495,7 @@
         showAppToast('Only admins can save site cost settings.');
         return;
       }
-      const pool = getSelectedPool();
+      const pool = getCostCentrePool();
       const state = getCostSettingsState();
       state[pool.key] = readCostCentreForm();
       saveCostSettingsState(state);
@@ -6527,7 +6539,7 @@
     }
 
     function buildCostCentreReportModel() {
-      const pool = getSelectedPool();
+      const pool = getCostCentrePool();
       const settings = readCostCentreForm();
       const transactions = (loadStockState().transactions || []).filter(tx => tx.poolKey === pool.key);
       let pricedTotal = 0;
@@ -6549,7 +6561,7 @@
     }
 
     function buildCostProjectionModel() {
-      const selectedPool = getSelectedPool();
+      const selectedPool = getCostCentrePool();
       const costSettingsState = getCostSettingsState();
       const selectedSettings = readCostCentreForm();
       const sitePools = POOLS.filter(pool => pool.site === selectedPool.site && pool.key !== 'raiders_ice_baths_all');
@@ -6644,6 +6656,10 @@
     function bindCostCentreControls() {
       applyCostSettingsToForm();
       renderCostReportPreview();
+      qs('costCentrePoolSelect')?.addEventListener('change', () => {
+        applyCostSettingsToForm();
+        renderCostReportPreview();
+      });
       qs('saveCostSettingsBtn')?.addEventListener('click', saveCurrentCostSettings);
       qs('backupCostDataBtn')?.addEventListener('click', backupCostDataToGoogleSheet);
       qs('refreshCostDataBtn')?.addEventListener('click', refreshCostDataFromGoogleSheet);
