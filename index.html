@@ -2623,7 +2623,7 @@
         </div>
 
         <div class="grid" style="gap: 12px;">
-          <div class="span-6" id="singlePhotoCaptureBlock" style="grid-column: span 12;">
+          <div class="span-6" id="singlePhotoCaptureBlock" style="grid-column: span 12;" hidden>
             <div class="button-row" style="margin-bottom: 10px; flex-wrap: wrap;">
               <label class="button secondary" for="photoInputCamera" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
                 Take Spin Touch photo
@@ -2762,18 +2762,17 @@
           <div class="subcard">
             <h3>Raiders Ice Bath 1</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
-            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
-              <label class="button secondary" for="iceBath1PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
+            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;" hidden><label class="button secondary" for="iceBath1PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
               <label class="button secondary" for="iceBath1PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Choose from library</label>
               <button class="button secondary" type="button" id="scanIceBath1PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath1PhotoBtn">Clear photo</button>
               <input id="iceBath1PhotoCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
               <input id="iceBath1PhotoInput" type="file" accept="image/*" class="hidden" />
             </div>
-            <div class="preview-box" id="iceBath1PhotoPreviewBox" style="min-height:160px;">
+            <div class="preview-box" id="iceBath1PhotoPreviewBox" style="min-height:160px;" hidden>
               <div class="placeholder">No photo attached for Ice Bath 1.</div>
             </div>
-            <div class="photo-note" id="iceBath1PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 1 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
+            <div class="photo-note" id="iceBath1PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;" hidden>Add a Spin Touch photo for Ice Bath 1 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
             <div class="field-grid" style="margin-top: 12px;">
               <div class="field"><label for="iceBath1Clarity">Water clarity</label><select id="iceBath1Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
               <div class="field"><label for="iceBath1Ph">Current pH</label><input id="iceBath1Ph" type="number" step="0.01" inputmode="decimal" /></div>
@@ -2790,18 +2789,17 @@
           <div class="subcard">
             <h3>Raiders Ice Bath 2</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
-            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
-              <label class="button secondary" for="iceBath2PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
+            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;" hidden><label class="button secondary" for="iceBath2PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
               <label class="button secondary" for="iceBath2PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Choose from library</label>
               <button class="button secondary" type="button" id="scanIceBath2PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath2PhotoBtn">Clear photo</button>
               <input id="iceBath2PhotoCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
               <input id="iceBath2PhotoInput" type="file" accept="image/*" class="hidden" />
             </div>
-            <div class="preview-box" id="iceBath2PhotoPreviewBox" style="min-height:160px;">
+            <div class="preview-box" id="iceBath2PhotoPreviewBox" style="min-height:160px;" hidden>
               <div class="placeholder">No photo attached for Ice Bath 2.</div>
             </div>
-            <div class="photo-note" id="iceBath2PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 2 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
+            <div class="photo-note" id="iceBath2PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;" hidden>Add a Spin Touch photo for Ice Bath 2 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
             <div class="field-grid" style="margin-top: 12px;">
               <div class="field"><label for="iceBath2Clarity">Water clarity</label><select id="iceBath2Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
               <div class="field"><label for="iceBath2Ph">Current pH</label><input id="iceBath2Ph" type="number" step="0.01" inputmode="decimal" /></div>
@@ -2818,18 +2816,17 @@
           <div class="subcard">
             <h3>Raiders Ice Bath 3</h3>
             <div class="inline-note" style="margin-bottom:10px;">Volume used for dosing: 6,000 L</div>
-            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;">
-              <label class="button secondary" for="iceBath3PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
+            <div class="button-row" style="margin: 6px 0 8px; flex-wrap: wrap;" hidden><label class="button secondary" for="iceBath3PhotoCameraInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Take photo</label>
               <label class="button secondary" for="iceBath3PhotoInput" style="display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">Choose from library</label>
               <button class="button secondary" type="button" id="scanIceBath3PhotoBtn">Read photo</button>
               <button class="button ghost" type="button" id="clearIceBath3PhotoBtn">Clear photo</button>
               <input id="iceBath3PhotoCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
               <input id="iceBath3PhotoInput" type="file" accept="image/*" class="hidden" />
             </div>
-            <div class="preview-box" id="iceBath3PhotoPreviewBox" style="min-height:160px;">
+            <div class="preview-box" id="iceBath3PhotoPreviewBox" style="min-height:160px;" hidden>
               <div class="placeholder">No photo attached for Ice Bath 3.</div>
             </div>
-            <div class="photo-note" id="iceBath3PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;">Add a Spin Touch photo for Ice Bath 3 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
+            <div class="photo-note" id="iceBath3PhotoOcrStatus" style="margin-top: 8px; font-size: 12px;" hidden>Add a Spin Touch photo for Ice Bath 3 and the app will try to fill pH, free chlorine, alkalinity, calcium hardness, temperature and phosphates.</div>
             <div class="field-grid" style="margin-top: 12px;">
               <div class="field"><label for="iceBath3Clarity">Water clarity</label><select id="iceBath3Clarity"><option value="">Select</option><option>Clear</option><option>Slightly cloudy</option><option>Cloudy</option><option>Poor</option></select></div>
               <div class="field"><label for="iceBath3Ph">Current pH</label><input id="iceBath3Ph" type="number" step="0.01" inputmode="decimal" /></div>
