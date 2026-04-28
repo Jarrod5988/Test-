@@ -2660,7 +2660,10 @@
               <input id="jobPhotoCameraInput" type="file" accept="image/*" capture="environment" multiple class="hidden" />
               <input id="jobPhotoInput" type="file" accept="image/*" multiple class="hidden" />
             </div>
-            <div class="photo-note" style="margin-bottom: 8px; font-size: 12px;">These photos will be added after the service report pages and saved in the same PDF file.</div>
+            <label class="inline-check" style="margin: 2px 0 8px; display:flex; align-items:flex-start; gap:8px; font-size:13px; color:#244766;">
+              <input id="includeJobPhotosInPdf" type="checkbox" style="margin-top:3px;" />
+              <span>Include job photos in the PDF <small style="display:block; color:#607d99; margin-top:2px;">Leave off for a fast report. Turn on only when photo pages are needed.</small></span>
+            </label>
             <div id="jobPhotoPreviewBox" class="job-photo-grid">
               <div class="placeholder" style="grid-column: 1 / -1;">No job photos attached yet.</div>
             </div>
@@ -8271,6 +8274,11 @@
       renderJobPhotoPreview();
     }
 
+    function shouldIncludeJobPhotosInPdf() {
+      const field = qs('includeJobPhotosInPdf');
+      return Boolean(field && field.checked && jobPhotoAttachments.length);
+    }
+
     async function handleJobPhotoUpload(event) {
       const files = Array.from(event.target.files || []).filter(Boolean);
       if (!files.length) return;
@@ -9025,7 +9033,7 @@ function drawTable(doc, startX, startY, columnWidths, headers, rows, options = {
 
 async function savePdfReport() {
       if (isIosSaveEnvironment()) {
-        showPdfPreparingPanel('Building the service report PDF now. This should appear straight away, even if the PDF takes a moment to finish.');
+        showPdfPreparingPanel(shouldIncludeJobPhotosInPdf() ? 'Building the service report PDF with job photos. Photo pages can take longer on iPhone.' : 'Building a fast service report PDF without job photo pages.');
         await waitForBrowserPaint();
       }
       renderReport();
@@ -9205,7 +9213,7 @@ async function savePdfReport() {
           doc.setTextColor(0, 0, 0);
         });
 
-        await appendJobPhotosToPdf(doc, { attachments: jobPhotoAttachments, blue, borderBlue, margin });
+        await appendJobPhotosToPdf(doc, { attachments: shouldIncludeJobPhotosInPdf() ? jobPhotoAttachments : [], blue, borderBlue, margin });
         const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
         const blob = doc.output('blob');
@@ -9386,7 +9394,7 @@ async function savePdfReport() {
       doc.text(model.footerText, pageWidth - margin, pageHeight - 10, { align: 'right' });
       doc.setTextColor(0, 0, 0);
 
-      await appendJobPhotosToPdf(doc, { attachments: jobPhotoAttachments, blue, borderBlue, margin });
+      await appendJobPhotosToPdf(doc, { attachments: shouldIncludeJobPhotosInPdf() ? jobPhotoAttachments : [], blue, borderBlue, margin });
       const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
       const blob = doc.output('blob');
