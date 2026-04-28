@@ -6449,6 +6449,15 @@
     }
 
     async function saveClosedLoopPdfReport() {
+      try {
+        await buildAndSaveClosedLoopPdfReport();
+      } catch (error) {
+        console.error('Closed loop PDF generation failed', error);
+        showPdfErrorPanel(error && error.message ? error.message : 'The closed loop PDF could not be created.');
+      }
+    }
+
+    async function buildAndSaveClosedLoopPdfReport() {
       if (isIosSaveEnvironment()) {
         showPdfPreparingPanel('Building the closed loop report PDF now. The save options will appear here when it is ready.');
         await waitForBrowserPaint();
@@ -6457,6 +6466,8 @@
         removePdfSavePanel();
         return;
       }
+      updatePdfPreparingPanel('Building the PDF pages...', 64);
+      await waitForBrowserPaint();
       if (!window.jspdf || !window.jspdf.jsPDF) {
         removePdfSavePanel();
         alert('PDF library did not load. Please refresh and try again.');
@@ -6545,6 +6556,8 @@
 
       const filenameBase = (model.systemName || 'closed-loop-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'closed-loop-report'}-${inputs.closedDate.value || 'report'}.pdf`;
+      updatePdfPreparingPanel('Finalising the PDF file...', 88);
+      await waitForBrowserPaint();
       const blob = doc.output('blob');
       await saveBlob(blob, filename, 'application/pdf');
       // Automatically record a closed loop visit snapshot whenever a PDF is saved.
@@ -7341,6 +7354,8 @@
         alert('No chemical use entries are logged for this pool yet. Record used chemicals first.');
         return;
       }
+      updatePdfPreparingPanel('Building the PDF pages...', 64);
+      await waitForBrowserPaint();
       if (!window.jspdf || !window.jspdf.jsPDF) {
         alert('PDF tools are still loading. Try again in a moment.');
         return;
@@ -8865,10 +8880,18 @@ function buildReportHtml() {
       `;
     }
 
-    function renderReport() {
-      if (!isRaidersGroupMode() && !isTrainingMode()) recordMarkedDosesToStockLog({ silent: true });
+    function renderReport(options = {}) {
+      const shouldRecordStock = options.recordStock !== false;
+      if (shouldRecordStock && !isRaidersGroupMode() && !isTrainingMode()) recordMarkedDosesToStockLog({ silent: true });
       qs('reportOutput').innerHTML = isRaidersGroupMode() ? buildRaidersGroupReportHtml() : buildReportHtml();
       qs('kpiReport').textContent = 'Ready';
+    }
+
+    function hasGeneratedServiceReport() {
+      const output = qs('reportOutput');
+      if (!output) return false;
+      const text = (output.textContent || '').trim();
+      return Boolean(text && !/tap\s+generate\s+report/i.test(text));
     }
 
     function isIosSaveEnvironment() {
@@ -8898,12 +8921,38 @@ function buildReportHtml() {
       panel.innerHTML = `
         <div style="width:min(420px,100%);background:#fff;border:1px solid #b8d8ef;border-radius:14px;box-shadow:0 20px 50px rgba(15,23,42,.28);padding:16px;color:#12395c;">
           <div style="font-weight:800;font-size:1.05rem;margin-bottom:6px;">Preparing PDF</div>
-          <div style="font-size:.9rem;line-height:1.45;color:#496886;margin-bottom:12px;">${escapeHtml(message)}</div>
-          <div style="height:8px;background:#e4f4fd;border-radius:99px;overflow:hidden;"><div style="height:100%;width:45%;background:#00a9e8;border-radius:99px;"></div></div>
+          <div data-pdf-panel-message style="font-size:.9rem;line-height:1.45;color:#496886;margin-bottom:12px;">${escapeHtml(message)}</div>
+          <div style="height:8px;background:#e4f4fd;border-radius:99px;overflow:hidden;"><div data-pdf-panel-progress style="height:100%;width:45%;background:#00a9e8;border-radius:99px;transition:width .18s ease;"></div></div>
           <div style="font-size:.78rem;color:#6b7f94;margin-top:10px;">Keep this open. The save options will appear here when the PDF is ready.</div>
         </div>
       `;
       document.body.appendChild(panel);
+      return panel;
+    }
+
+    function updatePdfPreparingPanel(message, progressPercent) {
+      const panel = document.getElementById('pdfSavePanel');
+      if (!panel) return;
+      const messageEl = panel.querySelector('[data-pdf-panel-message]');
+      if (messageEl && message) messageEl.textContent = message;
+      const progressEl = panel.querySelector('[data-pdf-panel-progress]');
+      if (progressEl && Number.isFinite(progressPercent)) progressEl.style.width = `${Math.max(8, Math.min(95, progressPercent))}%`;
+    }
+
+    function showPdfErrorPanel(message) {
+      removePdfSavePanel();
+      const panel = document.createElement('div');
+      panel.id = 'pdfSavePanel';
+      panel.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.42);display:flex;align-items:flex-end;justify-content:center;padding:16px;';
+      panel.innerHTML = `
+        <div style="width:min(420px,100%);background:#fff;border:1px solid #f3b8b8;border-radius:14px;box-shadow:0 20px 50px rgba(15,23,42,.28);padding:16px;color:#12395c;">
+          <div style="font-weight:800;font-size:1.05rem;margin-bottom:6px;color:#9f1239;">PDF could not be created</div>
+          <div style="font-size:.9rem;line-height:1.45;color:#496886;margin-bottom:12px;">${escapeHtml(message || 'Something stopped the PDF from finishing. Please try Generate report again, then Save report.')}</div>
+          <button class="button ghost" id="closePdfErrorBtn" type="button">Close</button>
+        </div>
+      `;
+      document.body.appendChild(panel);
+      document.getElementById('closePdfErrorBtn')?.addEventListener('click', removePdfSavePanel);
       return panel;
     }
 
@@ -9032,11 +9081,26 @@ function drawTable(doc, startX, startY, columnWidths, headers, rows, options = {
 
 
 async function savePdfReport() {
+      try {
+        await buildAndSavePdfReport();
+      } catch (error) {
+        console.error('Service PDF generation failed', error);
+        showPdfErrorPanel(error && error.message ? error.message : 'The service PDF could not be created.');
+      }
+    }
+
+async function buildAndSavePdfReport() {
       if (isIosSaveEnvironment()) {
         showPdfPreparingPanel(shouldIncludeJobPhotosInPdf() ? 'Building the service report PDF with job photos. Photo pages can take longer on iPhone.' : 'Building a fast service report PDF without job photo pages.');
         await waitForBrowserPaint();
       }
-      renderReport();
+      if (!hasGeneratedServiceReport()) {
+        renderReport();
+      } else {
+        renderReport({ recordStock: false });
+      }
+      updatePdfPreparingPanel('Building the PDF pages...', 64);
+      await waitForBrowserPaint();
       if (!window.jspdf || !window.jspdf.jsPDF) {
         removePdfSavePanel();
         alert('PDF library did not load. Please refresh and try again.');
@@ -9216,6 +9280,8 @@ async function savePdfReport() {
         await appendJobPhotosToPdf(doc, { attachments: shouldIncludeJobPhotosInPdf() ? jobPhotoAttachments : [], blue, borderBlue, margin });
         const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
+      updatePdfPreparingPanel('Finalising the PDF file...', 88);
+      await waitForBrowserPaint();
         const blob = doc.output('blob');
         await saveBlob(blob, filename, 'application/pdf');
         // Automatically save a snapshot for each Raiders ice bath when generating a group report.
@@ -9397,6 +9463,8 @@ async function savePdfReport() {
       await appendJobPhotosToPdf(doc, { attachments: shouldIncludeJobPhotosInPdf() ? jobPhotoAttachments : [], blue, borderBlue, margin });
       const filenameBase = (inputs.reportPoolName.value || 'water-quality-report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const filename = `${filenameBase || 'water-quality-report'}-${inputs.reportDate.value || 'report'}.pdf`;
+      updatePdfPreparingPanel('Finalising the PDF file...', 88);
+      await waitForBrowserPaint();
       const blob = doc.output('blob');
       await saveBlob(blob, filename, 'application/pdf');
       // Also store a visit snapshot for the selected pool whenever a PDF is saved.
