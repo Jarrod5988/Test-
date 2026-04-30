@@ -3320,6 +3320,7 @@
     const STOCK_STORAGE_KEY = 'mbs-pool-stock-v1';
     const AUTO_DOSING_DRUM_STORAGE_KEY = 'mbs-auto-dosing-drums-v1';
     const BLUERIIOT_ADVISOR_STORAGE_KEY = 'mbs-blueriiot-advisor-v1';
+    const BLUERIIOT_DEVICE_CACHE_KEY = 'mbs-blueriiot-devices-v1';
     const DEFAULT_LEAH_PO_EMAIL = 'leahm@mbsfm.com.au';
     const COST_CENTRE_STORAGE_KEY = 'mbs-cost-centre-settings-v1';
     const DOSE_KEYS = ['acid', 'chlorine', 'bicarb', 'calcium', 'stabiliser', 'salt'];
@@ -7041,11 +7042,48 @@
       saveJson(BLUERIIOT_ADVISOR_STORAGE_KEY, state);
     }
 
+    function getBlueRiiotDeviceCache() {
+      const devices = loadJson(BLUERIIOT_DEVICE_CACHE_KEY, []);
+      return Array.isArray(devices) ? devices : [];
+    }
+
+    function saveBlueRiiotDeviceCache(devices) {
+      saveJson(BLUERIIOT_DEVICE_CACHE_KEY, Array.isArray(devices) ? devices : []);
+    }
+
+    function getBlueRiiotDeviceLabel(device) {
+      if (!device) return '';
+      const name = device.deviceName || device.swimmingPoolName || 'BlueRiiot device';
+      const serial = device.blueSerial ? ` (${device.blueSerial})` : '';
+      return `${name}${serial}`;
+    }
+
+    function renderBlueRiiotDeviceOptions(devices, selectedSerial) {
+      const list = Array.isArray(devices) ? devices : [];
+      const options = ['<option value="">Select BlueRiiot device</option>'];
+      list.forEach(device => {
+        const serial = device.blueSerial || '';
+        if (!serial) return;
+        const selected = serial === selectedSerial ? ' selected' : '';
+        options.push(`<option value="${escapeHtml(serial)}"${selected}>${escapeHtml(getBlueRiiotDeviceLabel(device))}</option>`);
+      });
+      if (selectedSerial && !list.some(device => device.blueSerial === selectedSerial)) {
+        options.push(`<option value="${escapeHtml(selectedSerial)}" selected>${escapeHtml(selectedSerial)} (saved device)</option>`);
+      }
+      return options.join('');
+    }
+
+    function findBlueRiiotDeviceBySerial(serial) {
+      if (!serial) return null;
+      return getBlueRiiotDeviceCache().find(device => device.blueSerial === serial) || null;
+    }
+
     function getBlueRiiotSettingsForPool(state, poolKey) {
       const existing = (state.pools && state.pools[poolKey]) || {};
       return {
         enabled: existing.enabled || 'manual',
         deviceName: existing.deviceName || '',
+        blueSerial: existing.blueSerial || '',
         bridgeUrl: existing.bridgeUrl || '',
         latestPh: existing.latestPh ?? '',
         previousPh: existing.previousPh ?? '',
@@ -7087,7 +7125,7 @@
       const chips = [];
 
       if (settings.enabled === 'cloud') {
-        messages.push('Cloud bridge selected. Once the bridge endpoint is added, use it to pull latest BlueRiiot readings into these fields and log them to Google Sheets.');
+        messages.push('Google bridge selected. Load devices once, choose the BlueRiiot device for this pool, then fetch the latest reading when you need advice.');
       } else if (settings.enabled === 'off') {
         messages.push('BlueRiiot monitoring is marked as not used for this pool.');
       } else {
@@ -7179,7 +7217,15 @@
       const field = event.target;
       const key = field.dataset.field;
       if (!key) return;
-      state.pools[pool.key] = { ...current, [key]: field.value };
+      const next = { ...current, [key]: field.value };
+      if (key === 'blueSerial') {
+        const device = findBlueRiiotDeviceBySerial(field.value);
+        if (device) {
+          next.deviceName = device.deviceName || device.swimmingPoolName || next.deviceName;
+          next.enabled = 'cloud';
+        }
+      }
+      state.pools[pool.key] = next;
       saveBlueRiiotAdvisorState(state);
       renderBlueRiiotAdvisorSection();
     }
@@ -7191,21 +7237,40 @@
       return String(Math.max(0, Math.round((Date.now() - time) / 36e5)));
     }
 
+    async function loadBlueRiiotDevicesFromBridge() {
+      try {
+        showAppToast('Loading BlueRiiot devices...');
+        const response = await requestGoogleJsonp('blueRiiotDevices');
+        if (!response || response.ok === false) throw new Error(response && response.error ? response.error : 'No BlueRiiot device response returned.');
+        const devices = Array.isArray(response.devices) ? response.devices : [];
+        saveBlueRiiotDeviceCache(devices);
+        renderBlueRiiotAdvisorSection();
+        showAppToast(devices.length ? `Loaded ${devices.length} BlueRiiot device${devices.length === 1 ? '' : 's'}.` : 'No BlueRiiot devices were returned.');
+      } catch (error) {
+        console.error('BlueRiiot device load failed', error);
+        showAppToast(`BlueRiiot device load failed: ${error.message || error}`);
+      }
+    }
+
     async function fetchBlueRiiotFromBridge() {
       const pool = getSelectedPool();
       const state = loadBlueRiiotAdvisorState();
       const current = getBlueRiiotSettingsForPool(state, pool.key);
       try {
+        if (!current.blueSerial) {
+          throw new Error('Load BlueRiiot devices and choose the device for this pool first.');
+        }
         showAppToast('Fetching BlueRiiot reading...');
-        const response = await requestGoogleJsonp('blueRiiotSnapshot', { poolKey: pool.key });
+        const response = await requestGoogleJsonp('blueRiiotSnapshot', { blueSerial: current.blueSerial });
         if (!response || response.ok === false) throw new Error(response && response.error ? response.error : 'No BlueRiiot response returned.');
         const readings = Array.isArray(response.readings) ? response.readings : [];
-        if (!readings.length) throw new Error('No BlueRiiot reading matched this WaterOps pool. Check BLUERIIOT_POOL_MAP in Apps Script properties.');
+        if (!readings.length) throw new Error('No reading was found for the selected BlueRiiot device.');
         const reading = readings[0];
         state.pools[pool.key] = {
           ...current,
           enabled: 'cloud',
-          deviceName: reading.deviceName || reading.swimmingPoolName || current.deviceName,
+          blueSerial: current.blueSerial,
+          deviceName: reading.deviceName || reading.swimmingPoolName || findBlueRiiotDeviceBySerial(current.blueSerial)?.deviceName || current.deviceName,
           previousPh: current.latestPh || current.previousPh || '',
           previousAgeHours: current.readingAgeHours || current.previousAgeHours || '',
           latestPh: reading.ph == null ? current.latestPh : String(reading.ph),
@@ -7246,6 +7311,7 @@
       const pool = getSelectedPool();
       const state = loadBlueRiiotAdvisorState();
       const settings = getBlueRiiotSettingsForPool(state, pool.key);
+      const blueRiiotDevices = getBlueRiiotDeviceCache();
       const disabled = isTrainingMode() ? 'disabled' : '';
       const advice = buildBlueRiiotAdvice(settings, pool);
       const chipClass = tone => tone === 'bad' ? 'status-bad' : tone === 'warn' ? 'status-warn' : 'status-good';
@@ -7256,7 +7322,7 @@
             <label for="blueRiiotEnabled">BlueRiiot mode</label>
             <select id="blueRiiotEnabled" class="blueriiot-input" data-field="enabled" ${disabled}>
               <option value="manual" ${settings.enabled === 'manual' ? 'selected' : ''}>Manual reading entry</option>
-              <option value="cloud" ${settings.enabled === 'cloud' ? 'selected' : ''}>Cloud bridge planned</option>
+              <option value="cloud" ${settings.enabled === 'cloud' ? 'selected' : ''}>Google bridge</option>
               <option value="off" ${settings.enabled === 'off' ? 'selected' : ''}>Not used at this pool</option>
             </select>
           </div>
@@ -7265,9 +7331,11 @@
             <input id="blueRiiotDeviceName" class="blueriiot-input" data-field="deviceName" type="text" value="${escapeHtml(settings.deviceName)}" placeholder="BlueRiiot Plus name" ${disabled} />
           </div>
           <div class="field span-12" style="grid-column: 1 / -1;">
-            <label for="blueRiiotBridgeUrl">Bridge endpoint</label>
-            <input id="blueRiiotBridgeUrl" class="blueriiot-input" data-field="bridgeUrl" type="url" inputmode="url" value="${escapeHtml(settings.bridgeUrl)}" placeholder="Optional Google Apps Script or Cloudflare Worker URL" ${disabled} />
-            <small>Use a secure bridge later so WaterOps does not store BlueRiiot login details in the app.</small>
+            <label for="blueRiiotBlueSerial">BlueRiiot device</label>
+            <select id="blueRiiotBlueSerial" class="blueriiot-input" data-field="blueSerial" ${disabled}>
+              ${renderBlueRiiotDeviceOptions(blueRiiotDevices, settings.blueSerial)}
+            </select>
+            <small>Load devices from Google first, then pick the BlueRiiot device that belongs to this pool.</small>
           </div>
           <div class="span-12 mode-note" style="grid-column: 1 / -1;">Latest BlueRiiot Plus reading</div>
           <div class="field"><label for="blueRiiotLatestPh">Latest pH</label><input id="blueRiiotLatestPh" class="blueriiot-input" data-field="latestPh" type="number" step="0.01" inputmode="decimal" value="${escapeHtml(String(settings.latestPh))}" ${disabled} /></div>
@@ -7287,6 +7355,7 @@
         </div>
         <div class="actions" style="margin-bottom: 12px;">
           <button class="button secondary" type="button" id="copyManualPhToBlueRiiotBtn" ${disabled}>Use current manual pH</button>
+          <button class="button ghost" type="button" id="loadBlueRiiotDevicesBtn" ${disabled}>Load BlueRiiot devices</button>
           <button class="button ghost" type="button" id="fetchBlueRiiotBridgeBtn" ${disabled}>Fetch from Google bridge</button>
         </div>
         <div class="icebath-reference-grid" style="margin-bottom: 12px;">
@@ -7300,6 +7369,7 @@
         field.addEventListener('change', saveBlueRiiotAdvisorField);
       });
       qs('copyManualPhToBlueRiiotBtn')?.addEventListener('click', copyManualPhToBlueRiiot);
+      qs('loadBlueRiiotDevicesBtn')?.addEventListener('click', loadBlueRiiotDevicesFromBridge);
       qs('fetchBlueRiiotBridgeBtn')?.addEventListener('click', fetchBlueRiiotFromBridge);
     }
     function renderStockSection() {
