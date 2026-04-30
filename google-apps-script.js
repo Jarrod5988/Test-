@@ -4,6 +4,10 @@
  * Paste this whole file into Google Apps Script.
  * If your Apps Script is not attached to the Google Sheet, put the Sheet ID
  * between the quotes below. If it is attached to the Sheet, leave it blank.
+ *
+ * BlueRiiot needs UrlFetchApp permission. In Apps Script, enable the manifest
+ * file and make sure appsscript.json contains the oauthScopes from the
+ * WaterOps appsscript.json file.
  */
 
 var SPREADSHEET_ID = '';
@@ -103,6 +107,13 @@ function doPost(e) {
     ok: true,
     payloadType: payload.payloadType || 'visit'
   });
+}
+
+function authoriseWaterOpsServices() {
+  PropertiesService.getScriptProperties().getProperties();
+  getSpreadsheet_();
+  UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
+  return 'WaterOps permissions are authorised. Redeploy the web app after this runs successfully.';
 }
 
 function parsePayload_(e) {

@@ -7253,7 +7253,11 @@
         showAppToast(devices.length ? `Loaded ${devices.length} BlueRiiot device${devices.length === 1 ? '' : 's'}.` : 'No BlueRiiot devices were returned.');
       } catch (error) {
         console.error('BlueRiiot device load failed', error);
-        showAppToast(`BlueRiiot device load failed: ${error.message || error}`);
+        const message = String(error && error.message ? error.message : error);
+        const permissionHint = message.includes('script.external_request') || message.includes('UrlFetchApp.fetch')
+          ? 'Google Apps Script needs the WaterOps appsscript.json permissions, then run authoriseWaterOpsServices and redeploy.'
+          : message;
+        showAppToast(`BlueRiiot device load failed: ${permissionHint}`);
       }
     }
 
