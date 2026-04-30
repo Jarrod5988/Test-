@@ -16,13 +16,29 @@ var SHEETS = {
   costSnapshots: 'Cost Snapshots',
   costReports: 'Cost Reports',
   technicians: 'Technicians',
-  closedLoops: 'Closed Loop Log'
+  closedLoops: 'Closed Loop Log',
+  blueRiiotReadings: 'BlueRiiot Readings',
+  blueRiiotDevices: 'BlueRiiot Devices'
 };
 
 function doGet(e) {
   var params = e && e.parameter ? e.parameter : {};
   var action = String(params.action || '');
   var callback = String(params.callback || '');
+
+  if (action === 'blueRiiotSnapshot') {
+    return jsonp_(callback, buildBlueRiiotSnapshot_(params));
+  }
+  if (action === 'blueRiiotDevices') {
+    return jsonp_(callback, buildBlueRiiotDevicesResponse_());
+  }
+  if (action === 'setupBlueRiiotSheets') {
+    setupBlueRiiotSheets_();
+    return jsonp_(callback, {
+      ok: true,
+      message: 'BlueRiiot sheets are ready. Add BLUERIIOT_EMAIL and BLUERIIOT_PASSWORD in Apps Script Project Settings > Script properties.'
+    });
+  }
 
   if (action === 'costSnapshot') {
     return jsonp_(callback, {
@@ -54,7 +70,7 @@ function doGet(e) {
   return jsonp_(callback, {
     ok: true,
     message: 'WaterOps Google Sheets bridge is running.',
-    availableActions: ['costSnapshot', 'technicianList', 'verifyTechnician', 'setupTechnicianSheet', 'closedLoopVisit POST']
+    availableActions: ['costSnapshot', 'technicianList', 'verifyTechnician', 'setupTechnicianSheet', 'setupBlueRiiotSheets', 'blueRiiotDevices', 'blueRiiotSnapshot', 'closedLoopVisit POST']
   });
 }
 
@@ -354,6 +370,365 @@ function verifyTechnician_(name, pin) {
     };
   }
   return { ok: false, verified: false, error: 'Technician was not found.' };
+}
+function getBlueRiiotConfig_() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    email: props.getProperty('BLUERIIOT_EMAIL') || '',
+    password: props.getProperty('BLUERIIOT_PASSWORD') || '',
+    apiBase: props.getProperty('BLUERIIOT_API_BASE') || 'https://api.riiotlabs.com',
+    region: props.getProperty('BLUERIIOT_REGION') || 'eu-west-1',
+    language: props.getProperty('BLUERIIOT_LANGUAGE') || 'en',
+    poolMap: parseJsonObject_(props.getProperty('BLUERIIOT_POOL_MAP') || '{}')
+  };
+}
+
+function setupBlueRiiotSheets_() {
+  appendRows_(SHEETS.blueRiiotDevices, [blueRiiotDeviceHeader_()]);
+  appendRows_(SHEETS.blueRiiotReadings, [blueRiiotReadingHeader_()]);
+}
+
+function buildBlueRiiotDevicesResponse_() {
+  try {
+    var devices = fetchBlueRiiotDevices_();
+    upsertBlueRiiotDevices_(devices);
+    return { ok: true, devices: devices, count: devices.length };
+  } catch (error) {
+    return { ok: false, error: String(error && error.message ? error.message : error) };
+  }
+}
+
+function buildBlueRiiotSnapshot_(params) {
+  try {
+    var readings = fetchBlueRiiotReadings_();
+    var filtered = filterBlueRiiotReadings_(readings, params || {});
+    if (readings.length) appendBlueRiiotReadingRows_(readings);
+    return {
+      ok: true,
+      capturedAt: new Date().toISOString(),
+      count: filtered.length,
+      readings: filtered
+    };
+  } catch (error) {
+    return { ok: false, error: String(error && error.message ? error.message : error) };
+  }
+}
+
+function fetchBlueRiiotDevices_() {
+  var config = getBlueRiiotConfig_();
+  if (!config.email || !config.password) throw new Error('Missing BLUERIIOT_EMAIL or BLUERIIOT_PASSWORD in Script properties.');
+  var session = blueRiiotLogin_(config);
+  var poolsResponse = blueRiiotSignedGet_(config, session, '/prod/swimming_pool', { deleted: 'false' });
+  var pools = extractBlueRiiotArray_(poolsResponse, ['data', 'swimming_pools', 'swimmingPools', 'pools']);
+  var devices = [];
+  for (var i = 0; i < pools.length; i += 1) {
+    var pool = pools[i] || {};
+    var poolId = String(pool.id || pool.swimming_pool_id || pool.uuid || pool._id || '');
+    if (!poolId) continue;
+    var poolName = String(pool.name || pool.title || pool.label || poolId);
+    var blueResponse = blueRiiotSignedGet_(config, session, '/prod/swimming_pool/' + encodeURIComponent(poolId) + '/blue', null);
+    var blueItems = extractBlueRiiotArray_(blueResponse, ['data', 'blue', 'devices']);
+    for (var b = 0; b < blueItems.length; b += 1) {
+      var item = blueItems[b] || {};
+      var blue = item.blue_device || item.device || item;
+      var serial = String(blue.serial || blue.blue_device_serial || blue.id || blue.uuid || '');
+      if (!serial) continue;
+      devices.push({
+        swimmingPoolId: poolId,
+        swimmingPoolName: poolName,
+        blueSerial: serial,
+        deviceName: String(blue.name || blue.label || poolName),
+        waterOpsPoolKey: resolveBlueRiiotPoolKey_(config.poolMap, poolId, poolName, serial),
+        rawPoolJson: JSON.stringify(pool),
+        rawDeviceJson: JSON.stringify(blue)
+      });
+    }
+  }
+  return devices;
+}
+
+function fetchBlueRiiotReadings_() {
+  var config = getBlueRiiotConfig_();
+  if (!config.email || !config.password) throw new Error('Missing BLUERIIOT_EMAIL or BLUERIIOT_PASSWORD in Script properties.');
+  var session = blueRiiotLogin_(config);
+  var devices = fetchBlueRiiotDevicesWithSession_(config, session);
+  var readings = [];
+  for (var i = 0; i < devices.length; i += 1) {
+    var device = devices[i];
+    var path = '/prod/swimming_pool/' + encodeURIComponent(device.swimmingPoolId) + '/blue/' + encodeURIComponent(device.blueSerial) + '/lastMeasurements';
+    var response = blueRiiotSignedGet_(config, session, path, { mode: 'blue_and_strip' });
+    var measurementRows = extractBlueRiiotArray_(response, ['data', 'measurements', 'lastMeasurements']);
+    var reading = normaliseBlueRiiotReading_(device, response, measurementRows);
+    readings.push(reading);
+  }
+  upsertBlueRiiotDevices_(devices);
+  return readings;
+}
+
+function fetchBlueRiiotDevicesWithSession_(config, session) {
+  var poolsResponse = blueRiiotSignedGet_(config, session, '/prod/swimming_pool', { deleted: 'false' });
+  var pools = extractBlueRiiotArray_(poolsResponse, ['data', 'swimming_pools', 'swimmingPools', 'pools']);
+  var devices = [];
+  for (var i = 0; i < pools.length; i += 1) {
+    var pool = pools[i] || {};
+    var poolId = String(pool.id || pool.swimming_pool_id || pool.uuid || pool._id || '');
+    if (!poolId) continue;
+    var poolName = String(pool.name || pool.title || pool.label || poolId);
+    var blueResponse = blueRiiotSignedGet_(config, session, '/prod/swimming_pool/' + encodeURIComponent(poolId) + '/blue', null);
+    var blueItems = extractBlueRiiotArray_(blueResponse, ['data', 'blue', 'devices']);
+    for (var b = 0; b < blueItems.length; b += 1) {
+      var item = blueItems[b] || {};
+      var blue = item.blue_device || item.device || item;
+      var serial = String(blue.serial || blue.blue_device_serial || blue.id || blue.uuid || '');
+      if (!serial) continue;
+      devices.push({
+        swimmingPoolId: poolId,
+        swimmingPoolName: poolName,
+        blueSerial: serial,
+        deviceName: String(blue.name || blue.label || poolName),
+        waterOpsPoolKey: resolveBlueRiiotPoolKey_(config.poolMap, poolId, poolName, serial),
+        rawPoolJson: JSON.stringify(pool),
+        rawDeviceJson: JSON.stringify(blue)
+      });
+    }
+  }
+  return devices;
+}
+
+function blueRiiotLogin_(config) {
+  var response = UrlFetchApp.fetch(config.apiBase + '/prod/user/login', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    payload: JSON.stringify({ email: config.email, password: config.password })
+  });
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+  if (code < 200 || code >= 300) throw new Error('BlueRiiot login failed: HTTP ' + code + ' ' + text.slice(0, 220));
+  var json = JSON.parse(text || '{}');
+  var credentials = findCredentialsObject_(json);
+  if (!credentials.accessKeyId || !credentials.secretAccessKey || !credentials.sessionToken) {
+    throw new Error('BlueRiiot login did not return temporary API credentials. Response shape may have changed.');
+  }
+  return credentials;
+}
+
+function blueRiiotSignedGet_(config, session, path, query) {
+  var signed = signAwsGet_(config.apiBase, path, query || {}, config.region, session);
+  var response = UrlFetchApp.fetch(signed.url, {
+    method: 'get',
+    headers: signed.headers,
+    muteHttpExceptions: true
+  });
+  var code = response.getResponseCode();
+  var text = response.getContentText();
+  if (code < 200 || code >= 300) throw new Error('BlueRiiot API request failed: HTTP ' + code + ' ' + signed.pathWithQuery + ' ' + text.slice(0, 220));
+  return JSON.parse(text || '{}');
+}
+
+function normaliseBlueRiiotReading_(device, response, measurements) {
+  var reading = {
+    receivedAt: new Date().toISOString(),
+    waterOpsPoolKey: device.waterOpsPoolKey || '',
+    swimmingPoolId: device.swimmingPoolId,
+    swimmingPoolName: device.swimmingPoolName,
+    blueSerial: device.blueSerial,
+    deviceName: device.deviceName,
+    timestamp: response.last_blue_measure_timestamp || response.timestamp || '',
+    ph: '',
+    orp: '',
+    temperature: '',
+    salinity: '',
+    conductivity: '',
+    rawJson: JSON.stringify(response)
+  };
+  for (var i = 0; i < measurements.length; i += 1) {
+    var item = measurements[i] || {};
+    var name = String(item.name || item.type || item.key || '').toLowerCase();
+    var value = item.value == null ? '' : item.value;
+    if (name === 'ph' || name === 'pH'.toLowerCase()) reading.ph = value;
+    if (name === 'orp' || name === 'redox') reading.orp = value;
+    if (name === 'temperature' || name === 'temp') reading.temperature = value;
+    if (name === 'salinity' || name === 'salt') reading.salinity = value;
+    if (name === 'conductivity') reading.conductivity = value;
+    if (!reading.timestamp && item.timestamp) reading.timestamp = item.timestamp;
+  }
+  return reading;
+}
+
+function filterBlueRiiotReadings_(readings, params) {
+  var poolKey = String(params.poolKey || '').trim();
+  var serial = String(params.blueSerial || '').trim();
+  if (!poolKey && !serial) return readings;
+  var filtered = [];
+  for (var i = 0; i < readings.length; i += 1) {
+    var item = readings[i];
+    if (poolKey && item.waterOpsPoolKey !== poolKey) continue;
+    if (serial && item.blueSerial !== serial) continue;
+    filtered.push(item);
+  }
+  return filtered;
+}
+
+function appendBlueRiiotReadingRows_(readings) {
+  var rows = [blueRiiotReadingHeader_()];
+  for (var i = 0; i < readings.length; i += 1) {
+    var r = readings[i];
+    rows.push([
+      new Date(), r.timestamp || '', r.waterOpsPoolKey || '', r.swimmingPoolId || '', r.swimmingPoolName || '',
+      r.blueSerial || '', r.deviceName || '', r.ph, r.orp, r.temperature, r.salinity, r.conductivity, r.rawJson || ''
+    ]);
+  }
+  appendRows_(SHEETS.blueRiiotReadings, rows);
+}
+
+function upsertBlueRiiotDevices_(devices) {
+  if (!devices || !devices.length) {
+    appendRows_(SHEETS.blueRiiotDevices, [blueRiiotDeviceHeader_()]);
+    return;
+  }
+  var rows = [blueRiiotDeviceHeader_()];
+  for (var i = 0; i < devices.length; i += 1) {
+    var d = devices[i];
+    rows.push([new Date(), d.waterOpsPoolKey || '', d.swimmingPoolId || '', d.swimmingPoolName || '', d.blueSerial || '', d.deviceName || '', d.rawPoolJson || '', d.rawDeviceJson || '']);
+  }
+  var sheet = getOrCreateSheet_(SHEETS.blueRiiotDevices);
+  sheet.clearContents();
+  sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+function blueRiiotReadingHeader_() {
+  return ['receivedAt', 'measurementTimestamp', 'waterOpsPoolKey', 'swimmingPoolId', 'swimmingPoolName', 'blueSerial', 'deviceName', 'ph', 'orp', 'temperature', 'salinity', 'conductivity', 'rawJson'];
+}
+
+function blueRiiotDeviceHeader_() {
+  return ['updatedAt', 'waterOpsPoolKey', 'swimmingPoolId', 'swimmingPoolName', 'blueSerial', 'deviceName', 'rawPoolJson', 'rawDeviceJson'];
+}
+
+function resolveBlueRiiotPoolKey_(poolMap, poolId, poolName, serial) {
+  poolMap = poolMap || {};
+  return poolMap[serial] || poolMap[poolId] || poolMap[poolName] || '';
+}
+
+function extractBlueRiiotArray_(value, keys) {
+  if (Array.isArray(value)) return value;
+  for (var i = 0; i < keys.length; i += 1) {
+    var key = keys[i];
+    if (value && Array.isArray(value[key])) return value[key];
+  }
+  if (value && value.data && typeof value.data === 'object') {
+    for (var prop in value.data) {
+      if (value.data.hasOwnProperty(prop) && Array.isArray(value.data[prop])) return value.data[prop];
+    }
+  }
+  return [];
+}
+
+function parseJsonObject_(text) {
+  try {
+    var parsed = JSON.parse(text || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function findCredentialsObject_(json) {
+  var candidates = [json, json.data, json.credentials, json.Credentials, json.data && json.data.credentials, json.data && json.data.Credentials];
+  for (var i = 0; i < candidates.length; i += 1) {
+    var c = candidates[i] || {};
+    var accessKeyId = c.accessKeyId || c.AccessKeyId || c.access_key || c.accessKey || c.aws_access_key_id;
+    var secretAccessKey = c.secretAccessKey || c.SecretAccessKey || c.secret_key || c.secretKey || c.aws_secret_access_key;
+    var sessionToken = c.sessionToken || c.SessionToken || c.session_token || c.securityToken || c.Token;
+    if (accessKeyId && secretAccessKey && sessionToken) {
+      return {
+        accessKeyId: String(accessKeyId),
+        secretAccessKey: String(secretAccessKey),
+        sessionToken: String(sessionToken)
+      };
+    }
+  }
+  return {};
+}
+
+function signAwsGet_(baseUrl, path, query, region, session) {
+  var endpoint = parseUrl_(baseUrl);
+  var now = new Date();
+  var amzDate = Utilities.formatDate(now, 'UTC', "yyyyMMdd'T'HHmmss'Z'");
+  var dateStamp = Utilities.formatDate(now, 'UTC', 'yyyyMMdd');
+  var canonicalUri = canonicalUri_(path);
+  var canonicalQuery = canonicalQueryString_(query || {});
+  var host = endpoint.host;
+  var headers = {
+    host: host,
+    'x-amz-date': amzDate,
+    'x-amz-security-token': session.sessionToken
+  };
+  var signedHeaders = 'host;x-amz-date;x-amz-security-token';
+  var canonicalHeaders = 'host:' + host + '\n' + 'x-amz-date:' + amzDate + '\n' + 'x-amz-security-token:' + session.sessionToken + '\n';
+  var payloadHash = sha256Hex_('');
+  var canonicalRequest = ['GET', canonicalUri, canonicalQuery, canonicalHeaders, signedHeaders, payloadHash].join('\n');
+  var credentialScope = dateStamp + '/' + region + '/execute-api/aws4_request';
+  var stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, sha256Hex_(canonicalRequest)].join('\n');
+  var signingKey = getAwsSignatureKey_(session.secretAccessKey, dateStamp, region, 'execute-api');
+  var signature = bytesToHex_(Utilities.computeHmacSha256Signature(stringToSign, signingKey));
+  var authorization = 'AWS4-HMAC-SHA256 Credential=' + session.accessKeyId + '/' + credentialScope + ', SignedHeaders=' + signedHeaders + ', Signature=' + signature;
+  return {
+    url: baseUrl.replace(/\/$/, '') + canonicalUri + (canonicalQuery ? '?' + canonicalQuery : ''),
+    pathWithQuery: canonicalUri + (canonicalQuery ? '?' + canonicalQuery : ''),
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'WaterOps Google Apps Script',
+      'X-Amz-Date': amzDate,
+      'X-Amz-Security-Token': session.sessionToken,
+      'Authorization': authorization
+    }
+  };
+}
+
+function getAwsSignatureKey_(key, dateStamp, regionName, serviceName) {
+  var kDate = Utilities.computeHmacSha256Signature(dateStamp, 'AWS4' + key);
+  var kRegion = Utilities.computeHmacSha256Signature(regionName, kDate);
+  var kService = Utilities.computeHmacSha256Signature(serviceName, kRegion);
+  return Utilities.computeHmacSha256Signature('aws4_request', kService);
+}
+
+function canonicalUri_(path) {
+  var clean = String(path || '/');
+  if (clean.charAt(0) !== '/') clean = '/' + clean;
+  return clean.split('/').map(function(part) { return encodeURIComponent(decodeURIComponent(part)); }).join('/');
+}
+
+function canonicalQueryString_(query) {
+  var parts = [];
+  for (var key in query) {
+    if (query.hasOwnProperty(key) && query[key] != null && query[key] !== '') {
+      parts.push([encodeURIComponent(key), encodeURIComponent(String(query[key]))]);
+    }
+  }
+  parts.sort(function(a, b) {
+    if (a[0] === b[0]) return a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0;
+    return a[0] < b[0] ? -1 : 1;
+  });
+  return parts.map(function(pair) { return pair[0] + '=' + pair[1]; }).join('&');
+}
+
+function sha256Hex_(text) {
+  return bytesToHex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8));
+}
+
+function bytesToHex_(bytes) {
+  return bytes.map(function(byte) {
+    var value = byte;
+    if (value < 0) value += 256;
+    return ('0' + value.toString(16)).slice(-2);
+  }).join('');
+}
+
+function parseUrl_(url) {
+  var match = String(url || '').match(/^https?:\/\/([^\/]+)(.*)$/i);
+  if (!match) throw new Error('Invalid URL: ' + url);
+  return { host: match[1], path: match[2] || '' };
 }
 function appendVisitPayload_(payload) {
   appendRows_(SHEETS.visits, [

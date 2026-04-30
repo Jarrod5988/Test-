@@ -7184,6 +7184,44 @@
       renderBlueRiiotAdvisorSection();
     }
 
+    function blueRiiotReadingAgeHours(timestamp) {
+      if (!timestamp) return '';
+      const time = new Date(timestamp).getTime();
+      if (!Number.isFinite(time)) return '';
+      return String(Math.max(0, Math.round((Date.now() - time) / 36e5)));
+    }
+
+    async function fetchBlueRiiotFromBridge() {
+      const pool = getSelectedPool();
+      const state = loadBlueRiiotAdvisorState();
+      const current = getBlueRiiotSettingsForPool(state, pool.key);
+      try {
+        showAppToast('Fetching BlueRiiot reading...');
+        const response = await requestGoogleJsonp('blueRiiotSnapshot', { poolKey: pool.key });
+        if (!response || response.ok === false) throw new Error(response && response.error ? response.error : 'No BlueRiiot response returned.');
+        const readings = Array.isArray(response.readings) ? response.readings : [];
+        if (!readings.length) throw new Error('No BlueRiiot reading matched this WaterOps pool. Check BLUERIIOT_POOL_MAP in Apps Script properties.');
+        const reading = readings[0];
+        state.pools[pool.key] = {
+          ...current,
+          enabled: 'cloud',
+          deviceName: reading.deviceName || reading.swimmingPoolName || current.deviceName,
+          previousPh: current.latestPh || current.previousPh || '',
+          previousAgeHours: current.readingAgeHours || current.previousAgeHours || '',
+          latestPh: reading.ph == null ? current.latestPh : String(reading.ph),
+          readingAgeHours: blueRiiotReadingAgeHours(reading.timestamp),
+          orp: reading.orp == null ? current.orp : String(reading.orp),
+          temperature: reading.temperature == null ? current.temperature : String(reading.temperature),
+          salinity: reading.salinity == null ? (reading.conductivity == null ? current.salinity : String(reading.conductivity)) : String(reading.salinity)
+        };
+        saveBlueRiiotAdvisorState(state);
+        renderBlueRiiotAdvisorSection();
+        showAppToast('BlueRiiot reading updated.');
+      } catch (error) {
+        console.error('BlueRiiot bridge fetch failed', error);
+        showAppToast(`BlueRiiot fetch failed: ${error.message || error}`);
+      }
+    }
     function copyManualPhToBlueRiiot() {
       const pool = getSelectedPool();
       const manualPh = n(inputs.ph && inputs.ph.value);
@@ -7249,6 +7287,7 @@
         </div>
         <div class="actions" style="margin-bottom: 12px;">
           <button class="button secondary" type="button" id="copyManualPhToBlueRiiotBtn" ${disabled}>Use current manual pH</button>
+          <button class="button ghost" type="button" id="fetchBlueRiiotBridgeBtn" ${disabled}>Fetch from Google bridge</button>
         </div>
         <div class="icebath-reference-grid" style="margin-bottom: 12px;">
           ${advice.chips.map(item => `<div class="icebath-reference-card"><strong>${escapeHtml(item.label)}</strong><div class="icebath-reference-value"><span class="status-pill ${chipClass(item.tone)}">${escapeHtml(item.text)}</span></div></div>`).join('') || '<div class="icebath-reference-card"><strong>Status</strong><div class="icebath-reference-value">Add readings to build advice.</div></div>'}
@@ -7261,6 +7300,7 @@
         field.addEventListener('change', saveBlueRiiotAdvisorField);
       });
       qs('copyManualPhToBlueRiiotBtn')?.addEventListener('click', copyManualPhToBlueRiiot);
+      qs('fetchBlueRiiotBridgeBtn')?.addEventListener('click', fetchBlueRiiotFromBridge);
     }
     function renderStockSection() {
       const wrap = qs('stockContent');
