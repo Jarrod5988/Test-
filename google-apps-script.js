@@ -427,11 +427,11 @@ function fetchBlueRiiotDevices_() {
     if (!poolId) continue;
     var poolName = String(pool.name || pool.title || pool.label || poolId);
     var blueResponse = blueRiiotSignedGet_(config, session, '/prod/swimming_pool/' + encodeURIComponent(poolId) + '/blue', null);
-    var blueItems = extractBlueRiiotArray_(blueResponse, ['data', 'blue', 'devices']);
+    var blueItems = extractBlueRiiotDeviceItems_(blueResponse);
     for (var b = 0; b < blueItems.length; b += 1) {
       var item = blueItems[b] || {};
       var blue = item.blue_device || item.device || item;
-      var serial = String(blue.serial || blue.blue_device_serial || blue.id || blue.uuid || '');
+      var serial = getBlueRiiotDeviceSerial_(blue, item);
       if (!serial) continue;
       devices.push({
         swimmingPoolId: poolId,
@@ -475,11 +475,11 @@ function fetchBlueRiiotDevicesWithSession_(config, session) {
     if (!poolId) continue;
     var poolName = String(pool.name || pool.title || pool.label || poolId);
     var blueResponse = blueRiiotSignedGet_(config, session, '/prod/swimming_pool/' + encodeURIComponent(poolId) + '/blue', null);
-    var blueItems = extractBlueRiiotArray_(blueResponse, ['data', 'blue', 'devices']);
+    var blueItems = extractBlueRiiotDeviceItems_(blueResponse);
     for (var b = 0; b < blueItems.length; b += 1) {
       var item = blueItems[b] || {};
       var blue = item.blue_device || item.device || item;
-      var serial = String(blue.serial || blue.blue_device_serial || blue.id || blue.uuid || '');
+      var serial = getBlueRiiotDeviceSerial_(blue, item);
       if (!serial) continue;
       devices.push({
         swimmingPoolId: poolId,
@@ -559,15 +559,65 @@ function normaliseBlueRiiotReading_(device, response, measurements) {
 function filterBlueRiiotReadings_(readings, params) {
   var poolKey = String(params.poolKey || '').trim();
   var serial = String(params.blueSerial || '').trim();
-  if (!poolKey && !serial) return readings;
+  var swimmingPoolId = String(params.swimmingPoolId || '').trim();
+  if (!poolKey && !serial && !swimmingPoolId) return readings;
   var filtered = [];
   for (var i = 0; i < readings.length; i += 1) {
     var item = readings[i];
     if (poolKey && item.waterOpsPoolKey !== poolKey) continue;
     if (serial && item.blueSerial !== serial) continue;
+    if (swimmingPoolId && item.swimmingPoolId !== swimmingPoolId) continue;
     filtered.push(item);
   }
   return filtered;
+}
+
+function extractBlueRiiotDeviceItems_(blueResponse) {
+  var items = extractBlueRiiotArray_(blueResponse, ['blue', 'devices', 'items']);
+  if (items.length) return items;
+  var data = blueResponse && blueResponse.data;
+  var candidates = [
+    blueResponse && blueResponse.blue,
+    blueResponse && blueResponse.device,
+    data && data.blue,
+    data && data.device,
+    data && data.blue_device,
+    data && data.device_data
+  ];
+  for (var i = 0; i < candidates.length; i += 1) {
+    if (candidates[i] && typeof candidates[i] === 'object' && !Array.isArray(candidates[i])) return [candidates[i]];
+  }
+  return [];
+}
+
+function getBlueRiiotDeviceSerial_(blue, item) {
+  blue = blue || {};
+  item = item || {};
+  var candidates = [
+    blue.serial,
+    blue.blue_device_serial,
+    blue.blueDeviceSerial,
+    blue.serial_number,
+    blue.serialNumber,
+    blue.device_serial,
+    blue.deviceSerial,
+    blue.mac,
+    blue.uuid,
+    blue.id,
+    item.serial,
+    item.blue_device_serial,
+    item.blueDeviceSerial,
+    item.serial_number,
+    item.serialNumber,
+    item.device_serial,
+    item.deviceSerial,
+    item.uuid,
+    item.id
+  ];
+  for (var i = 0; i < candidates.length; i += 1) {
+    if (candidates[i] != null && String(candidates[i]).trim()) return String(candidates[i]).trim();
+  }
+  return '';
 }
 
 function appendBlueRiiotReadingRows_(readings) {

@@ -7054,20 +7054,25 @@
     function getBlueRiiotDeviceLabel(device) {
       if (!device) return '';
       const name = device.deviceName || device.swimmingPoolName || 'BlueRiiot device';
-      const serial = device.blueSerial ? ` (${device.blueSerial})` : '';
-      return `${name}${serial}`;
+      const id = device.blueSerial || device.swimmingPoolId || '';
+      return id ? `${name} (${id})` : name;
+    }
+
+    function getBlueRiiotDeviceKey(device) {
+      if (!device) return '';
+      return String(device.blueSerial || device.swimmingPoolId || device.deviceName || device.swimmingPoolName || '').trim();
     }
 
     function renderBlueRiiotDeviceOptions(devices, selectedSerial) {
       const list = Array.isArray(devices) ? devices : [];
       const options = ['<option value="">Select BlueRiiot device</option>'];
       list.forEach(device => {
-        const serial = device.blueSerial || '';
-        if (!serial) return;
-        const selected = serial === selectedSerial ? ' selected' : '';
-        options.push(`<option value="${escapeHtml(serial)}"${selected}>${escapeHtml(getBlueRiiotDeviceLabel(device))}</option>`);
+        const key = getBlueRiiotDeviceKey(device);
+        if (!key) return;
+        const selected = key === selectedSerial ? ' selected' : '';
+        options.push(`<option value="${escapeHtml(key)}"${selected}>${escapeHtml(getBlueRiiotDeviceLabel(device))}</option>`);
       });
-      if (selectedSerial && !list.some(device => device.blueSerial === selectedSerial)) {
+      if (selectedSerial && !list.some(device => getBlueRiiotDeviceKey(device) === selectedSerial)) {
         options.push(`<option value="${escapeHtml(selectedSerial)}" selected>${escapeHtml(selectedSerial)} (saved device)</option>`);
       }
       return options.join('');
@@ -7075,7 +7080,7 @@
 
     function findBlueRiiotDeviceBySerial(serial) {
       if (!serial) return null;
-      return getBlueRiiotDeviceCache().find(device => device.blueSerial === serial) || null;
+      return getBlueRiiotDeviceCache().find(device => getBlueRiiotDeviceKey(device) === serial || device.blueSerial === serial || device.swimmingPoolId === serial) || null;
     }
 
     function getBlueRiiotSettingsForPool(state, poolKey) {
@@ -7261,7 +7266,12 @@
           throw new Error('Load BlueRiiot devices and choose the device for this pool first.');
         }
         showAppToast('Fetching BlueRiiot reading...');
-        const response = await requestGoogleJsonp('blueRiiotSnapshot', { blueSerial: current.blueSerial });
+        const selectedDevice = findBlueRiiotDeviceBySerial(current.blueSerial);
+        const requestParams = {};
+        if (selectedDevice && selectedDevice.blueSerial) requestParams.blueSerial = selectedDevice.blueSerial;
+        if (selectedDevice && selectedDevice.swimmingPoolId) requestParams.swimmingPoolId = selectedDevice.swimmingPoolId;
+        if (!requestParams.blueSerial && !requestParams.swimmingPoolId) requestParams.blueSerial = current.blueSerial;
+        const response = await requestGoogleJsonp('blueRiiotSnapshot', requestParams);
         if (!response || response.ok === false) throw new Error(response && response.error ? response.error : 'No BlueRiiot response returned.');
         const readings = Array.isArray(response.readings) ? response.readings : [];
         if (!readings.length) throw new Error('No reading was found for the selected BlueRiiot device.');
@@ -7269,8 +7279,8 @@
         state.pools[pool.key] = {
           ...current,
           enabled: 'cloud',
-          blueSerial: current.blueSerial,
-          deviceName: reading.deviceName || reading.swimmingPoolName || findBlueRiiotDeviceBySerial(current.blueSerial)?.deviceName || current.deviceName,
+          blueSerial: getBlueRiiotDeviceKey(selectedDevice) || current.blueSerial,
+          deviceName: reading.deviceName || reading.swimmingPoolName || selectedDevice?.deviceName || selectedDevice?.swimmingPoolName || current.deviceName,
           previousPh: current.latestPh || current.previousPh || '',
           previousAgeHours: current.readingAgeHours || current.previousAgeHours || '',
           latestPh: reading.ph == null ? current.latestPh : String(reading.ph),
