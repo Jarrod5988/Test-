@@ -2286,6 +2286,11 @@
       color: #102a43;
       font-size: 20px;
       letter-spacing: 0;
+      transition: color 0.14s ease;
+    }
+
+    .card h2:hover {
+      color: #0076b4;
     }
 
     .card h2::before {
@@ -2323,9 +2328,18 @@
     .tab-btn:focus-visible,
     .check-pill:focus-within,
     #backToTop:focus-visible {
-      outline: 3px solid rgba(0, 159, 227, 0.18);
-      border-color: rgba(0, 118, 180, 0.62);
-      box-shadow: 0 0 0 1px rgba(0, 159, 227, 0.16), 0 8px 18px rgba(0, 113, 175, 0.08);
+      outline: 3px solid rgba(0, 159, 227, 0.55);
+      border-color: rgba(0, 118, 180, 0.80);
+      box-shadow: 0 0 0 1px rgba(0, 159, 227, 0.40), 0 8px 18px rgba(0, 113, 175, 0.08);
+    }
+
+    input:disabled,
+    select:disabled,
+    textarea:disabled,
+    .button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
     }
 
     .button,
@@ -2347,9 +2361,9 @@
     .button.secondary,
     .button.ghost,
     #resetBtn {
-      color: #0b4775;
-      background: #e8f5fc;
-      border-color: rgba(0, 118, 180, 0.24);
+      color: #07375a;
+      background: #dff0fa;
+      border-color: rgba(0, 118, 180, 0.38);
       box-shadow: none;
     }
 
@@ -2380,7 +2394,7 @@
       box-shadow: none;
       font-size: 12px;
       font-weight: 800;
-      border-radius: 999px;
+      border-radius: 8px;
     }
 
     .toolbar .button.training-toggle:hover,
