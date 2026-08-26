@@ -26,10 +26,76 @@ var SHEETS = {
   blueRiiotLinks: 'BlueRiiot Links'
 };
 
+var WATEROPS_SESSION_TOKEN_PREFIX = 'wops1';
+var WATEROPS_SESSION_SIGNING_KEY_PROPERTY = 'WATEROPS_SESSION_HMAC_KEY';
+var WATEROPS_SESSION_TTL_SECONDS = 8 * 60 * 60;
+var WATEROPS_CLIENT_DEVICE_STORAGE_KEY = 'mbs-cost-sync-device-id-v1';
+var WATEROPS_CLIENT_AUTH_STORAGE_KEY = 'mbs-technician-auth-v1';
+
+var WATEROPS_GET_ACTION_ACCESS = {
+  costSnapshot: 'session',
+  blueRiiotDevices: 'session',
+  blueRiiotSnapshot: 'session',
+  blueRiiotHistory: 'session',
+  blueRiiotDiagnostics: 'admin',
+  blueRiiotLinkPool: 'admin',
+  blueRiiotRefreshHistory: 'admin',
+  setupBlueRiiotSheets: 'admin',
+  setupTechnicianSheet: 'admin'
+};
+
 function doGet(e) {
   var params = e && e.parameter ? e.parameter : {};
-  var action = String(params.action || '');
+  var action = String(params.action || '').trim();
   var callback = String(params.callback || '');
+
+  if (!action) {
+    return jsonp_(callback, {
+      ok: true,
+      message: 'WaterOps Google Sheets bridge is running.'
+    });
+  }
+
+  if (action === 'technicianList') {
+    if (isWaterOpsSessionToken_(params.deviceId)) {
+      var existingSession = verifySessionCredential_(params.deviceId);
+      if (!existingSession.ok) {
+        return jsonpAuthFailure_(callback, existingSession.error || 'Session expired. Verify technician access again.');
+      }
+    }
+    var technicians = buildTechnicianAccess_();
+    return jsonp_(callback, {
+      ok: true,
+      names: buildTechnicianList_(technicians),
+      technicians: technicians
+    });
+  }
+
+  if (action === 'verifyTechnician') {
+    var verification = verifyTechnician_(params.name, params.pin);
+    if (!verification.ok || !verification.verified) return jsonp_(callback, verification);
+    var issued = issueSessionCredential_(verification.name, verification.role, params.deviceId);
+    verification.sessionToken = issued.token;
+    verification.sessionExpiresAt = new Date(issued.expiresAt * 1000).toISOString();
+    return jsonpLogin_(callback, verification);
+  }
+
+  var requiredAccess = WATEROPS_GET_ACTION_ACCESS[action];
+  if (!requiredAccess) {
+    return jsonp_(callback, { ok: false, error: 'Unknown action.' });
+  }
+
+  var authorised = verifySessionCredential_(params.deviceId);
+  if (!authorised.ok) {
+    return jsonpAuthFailure_(callback, authorised.error || 'Authentication required.');
+  }
+  if (requiredAccess === 'admin' && authorised.session.role !== 'admin') {
+    return jsonp_(callback, {
+      ok: false,
+      forbidden: true,
+      error: 'Admin access is required for this action.'
+    });
+  }
 
   if (action === 'blueRiiotSnapshot') {
     return jsonp_(callback, buildBlueRiiotSnapshot_(params));
@@ -56,39 +122,20 @@ function doGet(e) {
       message: 'BlueRiiot sheets are ready. Add BLUERIIOT_EMAIL and BLUERIIOT_PASSWORD in Apps Script Project Settings > Script properties.'
     });
   }
-
   if (action === 'costSnapshot') {
     return jsonp_(callback, {
       ok: true,
       snapshot: buildCostSnapshot_()
     });
   }
-  if (action === 'technicianList') {
-    var technicians = buildTechnicianAccess_();
-    return jsonp_(callback, {
-      ok: true,
-      names: buildTechnicianList_(technicians),
-      technicians: technicians
-    });
-  }
-  if (action === 'verifyTechnician') {
-    return jsonp_(callback, verifyTechnician_(params.name, params.pin));
-  }
-
   if (action === 'setupTechnicianSheet') {
-    ensureTechnicianHeader_(getOrCreateSheet_(SHEETS.technicians));
     return jsonp_(callback, {
       ok: true,
-      message: 'Technicians sheet is ready with Name, Role, PIN and Active columns.'
+      message: setupTechnicianSheet()
     });
   }
 
-
-  return jsonp_(callback, {
-    ok: true,
-    message: 'WaterOps Google Sheets bridge is running.',
-    availableActions: ['costSnapshot', 'technicianList', 'verifyTechnician', 'setupTechnicianSheet', 'setupBlueRiiotSheets', 'blueRiiotDevices', 'blueRiiotSnapshot', 'blueRiiotDiagnostics', 'blueRiiotLinkPool', 'blueRiiotHistory', 'blueRiiotRefreshHistory', 'closedLoopVisit POST']
-  });
+  return jsonp_(callback, { ok: false, error: 'Unknown action.' });
 }
 
 function doPost(e) {
@@ -96,8 +143,35 @@ function doPost(e) {
   if (!payload) {
     return json_({ ok: false, error: 'No payload received.' });
   }
+  if (payload.parseError) {
+    return json_({ ok: false, error: 'Invalid JSON payload.' });
+  }
+
+  var authorised = verifySessionCredential_(payload.deviceId);
+  if (!authorised.ok) {
+    return json_({
+      ok: false,
+      authRequired: true,
+      error: authorised.error || 'Authentication required.'
+    });
+  }
+
+  // The browser transports the signed session credential through the existing
+  // deviceId field. Never persist the bearer token to Sheets: restore the
+  // underlying non-secret device identifier before any existing handlers run.
+  payload.deviceId = authorised.session.deviceId || '';
 
   if (payload.payloadType === 'costSync') {
+    var allowedCostActions = {
+      snapshot: true,
+      cost_settings_saved: true,
+      stock_used_added: true,
+      stock_used_cleared: true,
+      cost_report_generated: true
+    };
+    if (!allowedCostActions[String(payload.action || '')]) {
+      return json_({ ok: false, error: 'Unknown cost sync action.' });
+    }
     handleCostSync_(payload);
     return json_({
       ok: true,
@@ -124,9 +198,15 @@ function doPost(e) {
 
 function authoriseWaterOpsServices() {
   PropertiesService.getScriptProperties().getProperties();
+  getSessionSigningKey_();
   getSpreadsheet_();
   UrlFetchApp.fetch('https://www.google.com', { muteHttpExceptions: true });
-  return 'WaterOps permissions are authorised. Redeploy the web app after this runs successfully.';
+  return 'WaterOps permissions and session signing are authorised. Redeploy the web app after this runs successfully.';
+}
+
+function setupTechnicianSheet() {
+  ensureTechnicianHeader_(getOrCreateSheet_(SHEETS.technicians));
+  return 'Technicians sheet is ready with Name, Role, PIN and Active columns.';
 }
 
 function parsePayload_(e) {
@@ -321,10 +401,13 @@ function getHeaderIndex_(headers, names, fallback) {
   return fallback;
 }
 
-function buildTechnicianAccess_() {
-  var sheet = getOrCreateSheet_(SHEETS.technicians);
-  ensureTechnicianHeader_(sheet);
+function getTechnicianSheetReadOnly_() {
+  return getSpreadsheet_().getSheetByName(SHEETS.technicians);
+}
 
+function buildTechnicianAccess_() {
+  var sheet = getTechnicianSheetReadOnly_();
+  if (!sheet) return [];
   var values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
 
@@ -366,12 +449,13 @@ function buildTechnicianList_(technicians) {
   return names;
 }
 
-function verifyTechnician_(name, pin) {
+function getTechnicianRecord_(name) {
   var cleanName = String(name || '').trim();
-  if (!cleanName) return { ok: false, verified: false, error: 'Technician name is required.' };
-  var sheet = getOrCreateSheet_(SHEETS.technicians);
-  ensureTechnicianHeader_(sheet);
+  if (!cleanName) return null;
+  var sheet = getTechnicianSheetReadOnly_();
+  if (!sheet) return null;
   var values = sheet.getDataRange().getValues();
+  if (!values.length) return null;
   var headers = {};
   for (var h = 0; h < values[0].length; h += 1) {
     headers[String(values[0][h] || '').trim().toLowerCase()] = h;
@@ -383,18 +467,209 @@ function verifyTechnician_(name, pin) {
   for (var i = 1; i < values.length; i += 1) {
     var row = values[i];
     if (String(row[nameIndex] || '').trim().toLowerCase() !== cleanName.toLowerCase()) continue;
-    if (activeIndex >= 0 && !isActiveTechnician_(row[activeIndex])) return { ok: false, verified: false, error: 'Technician is inactive.' };
-    var storedPin = pinIndex >= 0 ? String(row[pinIndex] || '').trim() : '';
-    if (storedPin && String(pin || '').trim() !== storedPin) return { ok: false, verified: false, error: 'Incorrect PIN.' };
     return {
-      ok: true,
-      verified: true,
       name: String(row[nameIndex] || '').trim(),
-      role: normaliseRole_(roleIndex >= 0 ? row[roleIndex] : '')
+      role: normaliseRole_(roleIndex >= 0 ? row[roleIndex] : '') || 'tech',
+      storedPin: pinIndex >= 0 ? String(row[pinIndex] || '').trim() : '',
+      active: activeIndex >= 0 ? isActiveTechnician_(row[activeIndex]) : true
     };
   }
-  return { ok: false, verified: false, error: 'Technician was not found.' };
+  return null;
 }
+
+function verifyTechnician_(name, pin) {
+  var cleanName = String(name || '').trim();
+  if (!cleanName) return { ok: false, verified: false, error: 'Technician name is required.' };
+  var record = getTechnicianRecord_(cleanName);
+  if (!record) return { ok: false, verified: false, error: 'Technician was not found.' };
+  if (!record.active) return { ok: false, verified: false, error: 'Technician is inactive.' };
+  if (record.storedPin && String(pin || '').trim() !== record.storedPin) {
+    return { ok: false, verified: false, error: 'Incorrect PIN.' };
+  }
+  return {
+    ok: true,
+    verified: true,
+    name: record.name,
+    role: record.role
+  };
+}
+
+function issueSessionCredential_(name, role, incomingDeviceId) {
+  var now = Math.floor(Date.now() / 1000);
+  var payload = {
+    v: 1,
+    sub: String(name || '').trim(),
+    role: normaliseRole_(role) || 'tech',
+    iat: now,
+    exp: now + WATEROPS_SESSION_TTL_SECONDS,
+    did: normaliseSessionDeviceId_(incomingDeviceId),
+    jti: Utilities.getUuid()
+  };
+  var encodedPayload = base64WebSafeText_(JSON.stringify(payload));
+  var signingInput = WATEROPS_SESSION_TOKEN_PREFIX + '.' + encodedPayload;
+  var signature = base64WebSafeBytes_(Utilities.computeHmacSha256Signature(signingInput, getSessionSigningKey_()));
+  return {
+    token: signingInput + '.' + signature,
+    expiresAt: payload.exp,
+    deviceId: payload.did
+  };
+}
+
+function verifySessionCredential_(token, options) {
+  options = options || {};
+  var raw = String(token || '').trim();
+  var parts = raw.split('.');
+  if (parts.length !== 3 || parts[0] !== WATEROPS_SESSION_TOKEN_PREFIX) {
+    return { ok: false, error: 'Authentication required.' };
+  }
+  var signingInput = parts[0] + '.' + parts[1];
+  var expectedSignature = base64WebSafeBytes_(Utilities.computeHmacSha256Signature(signingInput, getSessionSigningKey_()));
+  if (!constantTimeEquals_(parts[2], expectedSignature)) {
+    return { ok: false, error: 'Invalid session credential.' };
+  }
+
+  var payload;
+  try {
+    payload = JSON.parse(base64WebSafeDecodeText_(parts[1]));
+  } catch (error) {
+    return { ok: false, error: 'Invalid session credential.' };
+  }
+
+  var now = Math.floor(Date.now() / 1000);
+  if (!payload || payload.v !== 1 || !payload.sub || !payload.role || !payload.did || !payload.iat || !payload.exp) {
+    return { ok: false, error: 'Invalid session credential.' };
+  }
+  if (Number(payload.iat) > now + 60) return { ok: false, error: 'Invalid session credential.' };
+  if (!options.allowExpired && Number(payload.exp) <= now) {
+    return { ok: false, error: 'Session expired. Verify technician access again.' };
+  }
+
+  var tokenRole = normaliseRole_(payload.role) || 'tech';
+  if (!options.skipTechnicianCheck) {
+    var record = getTechnicianRecord_(payload.sub);
+    if (!record || !record.active) {
+      return { ok: false, error: 'Technician access is no longer active.' };
+    }
+    if (record.role !== tokenRole) {
+      return { ok: false, error: 'Session permissions changed. Verify technician access again.' };
+    }
+  }
+
+  return {
+    ok: true,
+    session: {
+      name: String(payload.sub),
+      role: tokenRole,
+      issuedAt: Number(payload.iat),
+      expiresAt: Number(payload.exp),
+      deviceId: String(payload.did),
+      id: String(payload.jti || '')
+    }
+  };
+}
+
+function isWaterOpsSessionToken_(value) {
+  return String(value || '').indexOf(WATEROPS_SESSION_TOKEN_PREFIX + '.') === 0;
+}
+
+function normaliseSessionDeviceId_(incoming) {
+  var raw = String(incoming || '').trim();
+  if (isWaterOpsSessionToken_(raw)) {
+    var existing = verifySessionCredential_(raw, { allowExpired: true, skipTechnicianCheck: true });
+    if (existing.ok && existing.session.deviceId) return existing.session.deviceId;
+    return 'waterops-' + Utilities.getUuid();
+  }
+  if (raw && raw.length <= 160 && /^[A-Za-z0-9._:-]+$/.test(raw)) return raw;
+  return 'waterops-' + Utilities.getUuid();
+}
+
+function getSessionSigningKey_() {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty(WATEROPS_SESSION_SIGNING_KEY_PROPERTY);
+  if (key) return key;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    key = props.getProperty(WATEROPS_SESSION_SIGNING_KEY_PROPERTY);
+    if (!key) {
+      key = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+      props.setProperty(WATEROPS_SESSION_SIGNING_KEY_PROPERTY, key);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return key;
+}
+
+function base64WebSafeText_(text) {
+  return base64WebSafeBytes_(Utilities.newBlob(String(text)).getBytes());
+}
+
+function base64WebSafeBytes_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, '');
+}
+
+function base64WebSafeDecodeText_(value) {
+  var text = String(value || '');
+  var padding = text.length % 4;
+  if (padding) text += new Array(5 - padding).join('=');
+  return Utilities.newBlob(Utilities.base64DecodeWebSafe(text)).getDataAsString('UTF-8');
+}
+
+function constantTimeEquals_(a, b) {
+  a = String(a || '');
+  b = String(b || '');
+  var length = Math.max(a.length, b.length);
+  var diff = a.length ^ b.length;
+  for (var i = 0; i < length; i += 1) {
+    diff |= (a.charCodeAt(i % Math.max(1, a.length)) || 0) ^ (b.charCodeAt(i % Math.max(1, b.length)) || 0);
+  }
+  return diff === 0;
+}
+
+function normaliseJsonpCallback_(callback) {
+  var clean = String(callback || '').trim();
+  if (!clean) return '';
+  return /^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(clean) ? clean : '';
+}
+
+function jsonpLogin_(callback, value) {
+  var cleanCallback = normaliseJsonpCallback_(callback);
+  var token = String(value && value.sessionToken || '');
+  var expiresAt = value && value.sessionExpiresAt ? new Date(value.sessionExpiresAt).getTime() : 0;
+  var bootstrap = '';
+  if (token) {
+    var ttlMs = Math.max(0, expiresAt - Date.now());
+    bootstrap = '(function(){try{' +
+      'localStorage.setItem(' + JSON.stringify(WATEROPS_CLIENT_DEVICE_STORAGE_KEY) + ',' + JSON.stringify(token) + ');' +
+      (ttlMs > 0 ? 'setTimeout(function(){try{if(localStorage.getItem(' + JSON.stringify(WATEROPS_CLIENT_DEVICE_STORAGE_KEY) + ')===' + JSON.stringify(token) + '){localStorage.removeItem(' + JSON.stringify(WATEROPS_CLIENT_DEVICE_STORAGE_KEY) + ');localStorage.removeItem(' + JSON.stringify(WATEROPS_CLIENT_AUTH_STORAGE_KEY) + ');if(typeof applyAccessControls==="function")applyAccessControls();}}catch(e){}},' + String(ttlMs) + ');' : '') +
+      '}catch(e){}})();';
+  }
+  return javascriptOutput_(bootstrap + jsonpInvocation_(cleanCallback, value));
+}
+
+function jsonpAuthFailure_(callback, message) {
+  var cleanCallback = normaliseJsonpCallback_(callback);
+  var value = { ok: false, authRequired: true, error: message || 'Authentication required.' };
+  var reset = '(function(){try{' +
+    'var current=localStorage.getItem(' + JSON.stringify(WATEROPS_CLIENT_DEVICE_STORAGE_KEY) + ')||"";' +
+    'if(current.indexOf(' + JSON.stringify(WATEROPS_SESSION_TOKEN_PREFIX + '.') + ')===0)localStorage.removeItem(' + JSON.stringify(WATEROPS_CLIENT_DEVICE_STORAGE_KEY) + ');' +
+    'localStorage.removeItem(' + JSON.stringify(WATEROPS_CLIENT_AUTH_STORAGE_KEY) + ');' +
+    'if(typeof applyAccessControls==="function")applyAccessControls();' +
+    '}catch(e){}})();';
+  return javascriptOutput_(reset + jsonpInvocation_(cleanCallback, value));
+}
+
+function jsonpInvocation_(callback, value) {
+  return callback ? callback + '(' + JSON.stringify(value) + ');' : JSON.stringify(value);
+}
+
+function javascriptOutput_(body) {
+  return ContentService
+    .createTextOutput(body)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
 function getBlueRiiotConfig_() {
   var props = PropertiesService.getScriptProperties();
   return {
@@ -1326,13 +1601,7 @@ function json_(value) {
 }
 
 function jsonp_(callback, value) {
-  var body = callback
-    ? callback + '(' + JSON.stringify(value) + ');'
-    : JSON.stringify(value);
-
-  return ContentService
-    .createTextOutput(body)
-    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return javascriptOutput_(jsonpInvocation_(normaliseJsonpCallback_(callback), value));
 }
 
 function numberOrNull_(value) {
